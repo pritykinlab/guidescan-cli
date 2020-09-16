@@ -73,4 +73,40 @@ namespace genomics::seq_io {
         return gs;
     }
 
+    void write_to_file(const genome_structure& gs, const std::string& filename){
+        std::ofstream fs;
+        fs.open(filename);
+        
+        for (auto p : gs) {
+            fs << std::get<0>(p);
+            fs << "\n";
+            fs << std::get<1>(p);
+            fs << "\n";
+        }
+
+        fs.close();
+    }
+
+    genome_structure load_from_file(const std::string& filename){
+        genome_structure gs;
+        std::ifstream fs;
+        fs.open(filename);
+        
+        while (fs) {
+            std::string chromosone, length_str;
+            std::getline(fs, chromosone);
+            std::getline(fs, length_str);
+
+            if (chromosone.length() == 0 || length_str.length() == 0) {
+                break;
+            }
+
+            size_t length = std::stoll(length_str);
+            gs.push_back(std::make_tuple(chromosone, length));
+
+        }
+
+        fs.close();
+        return gs;
+    }
 };

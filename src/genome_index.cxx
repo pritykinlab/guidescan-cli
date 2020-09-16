@@ -1,4 +1,3 @@
-#include <sdsl/suffix_arrays.hpp>
 
 #include "genome_index.hpp"
 

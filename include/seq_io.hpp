@@ -6,9 +6,11 @@
 #include <istream> 
 #include <ostream> 
 
-namespace genomics::seq_io {
-    typedef std::vector<std::tuple<std::string, size_t>> genome_structure;
+#include "genome_index.hpp"
 
+// TODO: Handle error cases
+
+namespace genomics::seq_io {
     /* Parses a FASTA input stream to a raw sequence of uppercase
        genomic symbols and sends it to an output stream. */
     void parse_sequence(std::istream& fasta_is, std::ostream& sequence_os);
@@ -18,6 +20,8 @@ namespace genomics::seq_io {
        within the genome */
     genome_structure parse_genome_structure(std::istream& fasta_is);
 
+    void write_to_file(const genome_structure& gs, const std::string& filename);
+    genome_structure load_from_file(const std::string& filename);
 };
 
 #endif /* SEQ_IO_H */

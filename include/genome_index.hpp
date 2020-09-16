@@ -1,6 +1,9 @@
 #ifndef GENOME_INDEX_H
 #define GENOME_INDEX_H
 
+#include <sdsl/suffix_arrays.hpp>
+#include <vector>
+
 namespace genomics {
     typedef std::vector<std::tuple<std::string, size_t>> genome_structure;
 

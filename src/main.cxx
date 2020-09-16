@@ -36,7 +36,13 @@ int main(int argc, char *argv[])
         cout << get<0>(p) << " " << get<1>(p) << endl;
     }
 
-    cout << foo.str() << endl;
+    cout << "Sequence: " << foo.str().substr(0, 10) << "..." << endl;
+
+    genomics::seq_io::write_to_file(gs, string("test.gs"));
+    auto gs2 = genomics::seq_io::load_from_file(string("test.gs"));
+    for (const auto &p : gs2) {
+        cout << get<0>(p) << " " << get<1>(p) << endl;
+    }
 
     return 0;
 }
