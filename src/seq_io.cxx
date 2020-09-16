@@ -83,14 +83,12 @@ namespace genomics::seq_io {
             fs << std::get<1>(p);
             fs << "\n";
         }
-
-        fs.close();
     }
 
-    genome_structure load_from_file(const std::string& filename){
-        genome_structure gs;
-        std::ifstream fs;
-        fs.open(filename);
+    bool load_from_file(genome_structure& gs, const std::string& filename){
+        std::ifstream fs(filename);
+
+        if (!fs) return false;
         
         while (fs) {
             std::string chromosone, length_str;
@@ -103,10 +101,8 @@ namespace genomics::seq_io {
 
             size_t length = std::stoll(length_str);
             gs.push_back(std::make_tuple(chromosone, length));
-
         }
 
-        fs.close();
-        return gs;
+        return true;
     }
 };

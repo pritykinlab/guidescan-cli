@@ -1,4 +1,4 @@
-#include <cstdio>
+#include <filesystem>
 #include <istream>
 #include <sdsl/suffix_arrays.hpp>
 #include "genome_index.hpp"
@@ -16,33 +16,60 @@ size_t hamming_distance(std::string s1, std::string s2) {
     return count;
 }
 
+bool file_exists(const std::string& fileName)
+{
+    std::ifstream infile(fileName);
+    return infile.good();
+}
+
 int main(int argc, char *argv[])
 {
     using namespace std;
 
-    string dna_seq("ATGCGAATCGATCGAGGAGCGATTATTCGGATCGGATCTAGCATGACGATCAG\n> asad 2\nActGGASnNtT");
-    string fasta_header("> genome 1\n");
-    istringstream fasta_is(fasta_header + dna_seq);
+    string fasta_file(argv[1]);
+    string raw_sequence_file = fasta_file + ".dna";
+    string genome_structure_file = fasta_file + ".gs";
+    string fm_index_file = fasta_file + ".csa";
 
-    ostringstream foo;
-
-    auto gs = genomics::seq_io::parse_genome_structure(fasta_is);
-
-    fasta_is.clear();
-    fasta_is.seekg(0);
-    genomics::seq_io::parse_sequence(fasta_is, foo);
-
-    for (const auto &p : gs) {
-        cout << get<0>(p) << " " << get<1>(p) << endl;
+    ifstream fasta_is(fasta_file);
+    if (!fasta_is) {
+        cerr << "ERROR: FASTA file \"" << fasta_file
+             << "\" does not exist." << endl;
+        return 1;
     }
 
-    cout << "Sequence: " << foo.str().substr(0, 10) << "..." << endl;
+    if (!file_exists(raw_sequence_file)) {
+        ofstream os(raw_sequence_file);
+        if (!os) {
+            cerr << "ERROR: Could not create raw sequence file." << endl;
+            return 1;
+        }
 
-    genomics::seq_io::write_to_file(gs, string("test.gs"));
-    auto gs2 = genomics::seq_io::load_from_file(string("test.gs"));
-    for (const auto &p : gs2) {
-        cout << get<0>(p) << " " << get<1>(p) << endl;
+        cout << "No raw sequence file. Building now..." << endl;
+        genomics::seq_io::parse_sequence(fasta_is, os);
     }
+
+    genomics::genome_structure gs;
+    if (!genomics::seq_io::load_from_file(gs, genome_structure_file)) {
+        cout << "No genome structure file. Building now..." << endl;
+
+        fasta_is.clear();
+        fasta_is.seekg(0);
+        gs = genomics::seq_io::parse_genome_structure(fasta_is);
+        genomics::seq_io::write_to_file(gs, genome_structure_file);
+    }
+
+    sdsl::csa_wt<sdsl::wt_huff<>, 32, 8192> fm_index;
+    if (!load_from_file(fm_index, fm_index_file)) {
+        cout << "No index " << fm_index_file
+             << " located. Building index now." << endl;
+
+        construct(fm_index, raw_sequence_file, 1);
+        store_to_file(fm_index, fm_index_file);
+    }   
+
+    genomics::genome_index<sdsl::wt_huff<>, 32, 8192> gi(fm_index, gs);
+    cout << "Successful." << endl;
 
     return 0;
 }

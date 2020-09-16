@@ -21,7 +21,7 @@ namespace genomics::seq_io {
     genome_structure parse_genome_structure(std::istream& fasta_is);
 
     void write_to_file(const genome_structure& gs, const std::string& filename);
-    genome_structure load_from_file(const std::string& filename);
+    bool load_from_file(genome_structure& gs, const std::string& filename);
 };
 
 #endif /* SEQ_IO_H */
