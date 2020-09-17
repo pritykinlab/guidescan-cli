@@ -1,7 +1,8 @@
-#include "seq_io.hpp"
 #include <string>
 #include <iostream>
 #include <algorithm>
+
+#include "seq_io.hpp"
 
 namespace genomics::seq_io {
     namespace {

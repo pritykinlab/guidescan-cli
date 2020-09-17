@@ -1,4 +1,4 @@
-add_executable(main main.cxx seq_io.cxx)
+add_executable(main seq_io.cxx main.cxx)
 
 target_include_directories(main PUBLIC 
   "${CMAKE_SOURCE_DIR}/include"
