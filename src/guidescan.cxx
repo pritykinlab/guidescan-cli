@@ -3,9 +3,31 @@
 
 #include <sdsl/suffix_arrays.hpp>
 
+#include "cxxopts.hpp"
 #include "genome_index.hpp"
 #include "seq_io.hpp"
 #include "kmer.hpp"
+
+cxxopts::Options create_options() {
+    cxxopts::Options options("guidescan", "Guidescan interface for gRNA database generation.");
+
+    options.add_options()
+        ("k,kmerlength", "Length of kmers",
+         cxxopts::value<size_t>() -> default_value("20"), "LENGTH")
+        ("p,pam", "PAM string",
+         cxxopts::value<std::string>() -> default_value("NGG"), "PAM")
+        ("n,threads", "Number of threads to run across",
+         cxxopts::value<size_t>(), "NTHREADS")
+        ("g,genome", "Genome in FASTA .fna format",
+         cxxopts::value<std::string>(), "GENOME")
+        ("v,verbose", "Enable verbosity")
+        ("h,help", "Print help");
+
+    options.parse_positional({"genome"});
+    options.positional_help("[genome]");
+
+    return options;
+}
 
 bool file_exists(const std::string& fileName)
 {
@@ -17,12 +39,29 @@ int main(int argc, char *argv[])
 {
     using namespace std;
 
-    if (argc < 2) {
-        cout << "Usage: ./main [fasta_file]" << endl;
-        return 1;
+    auto options = create_options();
+
+    string fasta_file, pam;
+    size_t nthreads, kmer_length;
+    
+    try {
+        auto result = options.parse(argc, argv);
+
+        if (result["genome"].count() < 1 || result["help"].count() > 0) {
+            cout << options.help() << endl;
+            return 1;
+        }
+
+        fasta_file  = result["genome"].as<string>();
+        pam         = result["pam"].as<string>();
+        kmer_length = result["kmerlength"].as<size_t>();
+        nthreads    = result["threads"].count() ?
+            result["threads"].as<size_t>() : thread::hardware_concurrency();
+    } catch (const cxxopts::OptionParseException& e) {
+        std::cout << e.what() << std::endl;
+        std::exit(1);
     }
 
-    string fasta_file(argv[1]);
     string raw_sequence_file = fasta_file + ".dna";
     string genome_structure_file = fasta_file + ".gs";
     string fm_index_file = fasta_file + ".csa";
@@ -71,12 +110,10 @@ int main(int argc, char *argv[])
     cout << "Successfully loaded index." << endl;
                      
     vector<thread> threads;
-    size_t num_thread = 64;
-    size_t k = 20;
-    for (int i = 0; i < num_thread; i++) {
+    for (int i = 0; i < nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<sdsl::wt_huff<>, 32, 8192>,
-                 cref(gi), cref(raw_sequence_file), k, string("NGG"), ref(cout),
-                 i, num_thread);
+                 cref(gi), cref(raw_sequence_file), kmer_length, pam, ref(cout),
+                 i, nthreads);
         threads.push_back(move(t));
     }
 
