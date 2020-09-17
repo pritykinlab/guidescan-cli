@@ -54,7 +54,7 @@ namespace genomics {
         gi.inexact_search(kmer.begin(), kmer.end(), 3, callback, off_targets);
 
         output << kmer << " 1-" << off_targets[1] << ":2-" << off_targets[2]
-               << ":3-" << off_targets[3] << std::endl;
+               << ":3-" << off_targets[3] << std::endl; // race condition if multithreading
     }
 
     /* Processes the kmers in the file, collecting all information
@@ -74,7 +74,7 @@ namespace genomics {
         }
 
         std::vector<char> kmer_buffer(k);
-        size_t position = 1;
+        size_t position = 0;
 
         for (; is; position++) {
             is.read(kmer_buffer.data(), k);
@@ -82,16 +82,13 @@ namespace genomics {
             
             std::string kmer(kmer_buffer.data());
 
-            if (position < start_position || position % step_size != 0)
+            if ((position - start_position) % step_size != 0)
                 continue;
 
             if (pam_matches_foward(kmer, pam) ||
                 pam_matches_reverse(kmer, pam)) {
                 process_kmer_to_stream(gi, kmer, pam, output);
             }
-
-            //if (position % 1000 == 0) std::cerr << "PROGRESS: " << position << std::endl;
-            if (position > 500000) break;
         }
     }
 }

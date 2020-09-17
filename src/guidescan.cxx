@@ -1,4 +1,3 @@
-#include <filesystem>
 #include <thread>
 #include <istream>
 
@@ -18,7 +17,7 @@ int main(int argc, char *argv[])
 {
     using namespace std;
 
-    if (argc < 1) {
+    if (argc < 2) {
         cout << "Usage: ./main [fasta_file]" << endl;
         return 1;
     }
@@ -72,11 +71,12 @@ int main(int argc, char *argv[])
     cout << "Successfully loaded index." << endl;
                      
     vector<thread> threads;
-    for (int i = 0; i < 16; i++) {
+    size_t num_thread = 64;
+    size_t k = 20;
+    for (int i = 0; i < num_thread; i++) {
         thread t(genomics::process_kmers_to_stream<sdsl::wt_huff<>, 32, 8192>,
-                 cref(gi), cref(raw_sequence_file),
-                 20, string("NGG"), ref(cout),
-                 i, 16);
+                 cref(gi), cref(raw_sequence_file), k, string("NGG"), ref(cout),
+                 i, num_thread);
         threads.push_back(move(t));
     }
 
