@@ -1,6 +1,7 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 2.8.11)
 
-project(guidescan-cli VERSION 2.0)
+project(guidescan-cli)
+set(PROJECT_VERSION VERSION 2.0)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

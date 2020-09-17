@@ -8,7 +8,6 @@ set(PROJECT_VENDOR "Simon Gog")
 set(PROJECT_CONTACT "simon.gog@gmail.com")
 set(PROJECT_URL "https://github.com/simongog/sdsl-lite")
 set(PROJECT_DESCRIPTION "SDSL: Succinct Data Structure Library")
-# set(CMAKE_BUILD_TYPE "Release")
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" PROJECT_VERSION_FULL)
 string(REGEX REPLACE "[\n\r]" "" PROJECT_VERSION_FULL "${PROJECT_VERSION_FULL}")
