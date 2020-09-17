@@ -90,7 +90,8 @@ namespace genomics {
                 process_kmer_to_stream(gi, kmer, pam, output);
             }
 
-            if (position % 1000 == 0) std::cerr << "PROGRESS: " << position << std::endl;
+            //if (position % 1000 == 0) std::cerr << "PROGRESS: " << position << std::endl;
+            if (position > 500000) break;
         }
     }
 }
