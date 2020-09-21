@@ -41,6 +41,19 @@ namespace genomics {
             return csa[bwt_position];
         }
 
+        /* 
+           Searches for all strings in the genome matching the given
+           query, up to a certain number of mismatches and allowing
+           the wildcard character 'N' in the query.
+
+           When a set of matches are found, the callback is called
+           with the start and end position in the BWT of the genome,
+           along with the number of mismatches, and a reference to
+           the passed in data.
+
+           To get the position of the matches in the original string,
+           use the resolve(...) method of the class.
+        */
         template <class t_data>
         void inexact_search(typename std::string::const_iterator begin,
                             typename std::string::const_iterator end,
@@ -67,6 +80,7 @@ namespace genomics {
                                                                 t_data& data) const {
         if (begin == end) {
             callback(sp, ep, k, data);
+            return;
         }
 
         char c = *(end - 1);
@@ -81,7 +95,9 @@ namespace genomics {
                            k, callback, data);
         }
 
-        if (k >= mismatches) return;
+        size_t cost = 1;
+        if (k >= mismatches && c != 'N') return;
+        if (c == 'N') cost = 0;
 
         for (int i = 0; i < search_alphabet_size; i++) {
             if (search_alphabet[i] == c) continue;
@@ -95,7 +111,7 @@ namespace genomics {
                 size_t sp_prime = csa.C[csa.char2comp[a]] + occ_before;
                 size_t ep_prime = sp_prime + occ_within - 1;
                 inexact_search(begin, end - 1, sp_prime, ep_prime, mismatches,
-                               k + 1, callback, data);
+                               k + cost, callback, data);
             }
         }
     }

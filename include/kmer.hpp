@@ -1,3 +1,7 @@
+/* 
+   Defines functionality for finding kmers from a stream of nucleotides. 
+*/
+
 #ifndef KMER_H
 #define KMER_H
 
@@ -7,90 +11,47 @@
 #include "genome_index.hpp"
 
 namespace genomics {
-    class kmer {
-    public:
+    enum class direction {positive, negative};
+
+    struct kmer {
         std::string sequence;
+        std::string pam;
         size_t absolute_position;
+        direction dir;
     };
 
-    namespace {
-        bool pam_matches_reverse(const std::string& kmer,
-                                 const std::string& pam) {
-            for (size_t i = 0; i < pam.length(); i++) {
-                if (pam[i] == 'N') continue;
-                if (kmer[i] != pam[pam.length() - 1 - i]) return false;
-            }
+    /* 
+       A producer class for kmers built on top of std::istream. Returns
+       the next kmer available if it can find one.
 
-            return true;
-        }
+       It is assumed that the sequence represents a forward strand of
+       DNA and the PAM sequence can match on either the forward or
+       backward strand of it. 
 
-        bool pam_matches_foward(const std::string& kmer,
-                                const std::string& pam) {
-            for (size_t i = 0; i < pam.length(); i++) {
-                if (pam[i] == 'N') continue;
-                if (kmer[kmer.length() - pam.length() + i] != pam[i]) return false;
-            }
+       The PAM supports the wildcard 'N' matching any nucleotide.
+     */
+    class kmer_producer {
+    private:
+        std::istream& sequence;
+        std::string pam;
+        size_t k;
 
-            return true;
-        }
+        size_t stream_position = 0;
+        size_t buffer_len;
+        std::vector<char> kmer_buffer;
+        std::queue<kmer> kmer_queue;
 
-        
-        void off_target_counter(size_t sp, size_t ep, size_t k,
-                                std::vector<size_t> &off_targets) {
-            off_targets[k] += ep - sp + 1;
-        }
+    public:
+        kmer_producer(std::istream& sequence, size_t k, const std::string &pam);
+        kmer_producer() = delete;
 
-        std::function<void(size_t, size_t, size_t, std::vector<size_t>&)> callback = off_target_counter;
+        /* 
+           Gets the next available kmer, returning 1 on success and 0
+           if the stream is no longer valid for any reason
+           (eofbit/badbit/failbit). 
+        */
+        size_t get_next_kmer(kmer& out_kmer);
     };
-
-    template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-    void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
-                                const std::string& kmer,
-                                const std::string& pam,
-                                std::ostream& output) {
-        if (sdsl::count(gi.csa, kmer.begin(), kmer.end()) > 1) return;
-
-        std::vector<size_t> off_targets(4);
-        gi.inexact_search(kmer.begin(), kmer.end(), 3, callback, off_targets);
-
-        output << kmer << " 1-" << off_targets[1] << ":2-" << off_targets[2]
-               << ":3-" << off_targets[3] << std::endl; // race condition if multithreading
-    }
-
-    /* Processes the kmers in the file, collecting all information
-       about off targets and outputting it to a stream in BED format. */
-    template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-    void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
-                                 const std::string& raw_sequence_file,
-                                 size_t k,
-                                 const std::string& pam,
-                                 std::ostream& output,
-                                 size_t start_position,
-                                 size_t step_size) {
-
-        std::ifstream is(raw_sequence_file);
-        if (!is) {
-            throw std::runtime_error("Sequence file not available.");
-        }
-
-        std::vector<char> kmer_buffer(k);
-        size_t position = 0;
-
-        for (; is; position++) {
-            is.read(kmer_buffer.data(), k);
-            is.seekg(1 - k, std::ios_base::cur);
-            
-            std::string kmer(kmer_buffer.data());
-
-            if ((position - start_position) % step_size != 0)
-                continue;
-
-            if (pam_matches_foward(kmer, pam) ||
-                pam_matches_reverse(kmer, pam)) {
-                process_kmer_to_stream(gi, kmer, pam, output);
-            }
-        }
-    }
-}
+};
 
 #endif /* KMER_H */

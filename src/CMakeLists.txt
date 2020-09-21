@@ -1,4 +1,4 @@
-add_executable(guidescan seq_io.cxx guidescan.cxx)
+add_executable(guidescan seq_io.cxx kmer.cxx guidescan.cxx)
 
 target_include_directories(guidescan PUBLIC 
   "${CMAKE_SOURCE_DIR}/include"

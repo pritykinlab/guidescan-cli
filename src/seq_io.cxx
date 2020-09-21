@@ -30,10 +30,9 @@ namespace genomics {
 
                 for (auto i = 0; i < seq.length(); i++) {
                     seq[i] = toupper(seq[i]);
+                }
             }
-            }
-        }
-
+        };
 
         void parse_sequence(std::istream& fasta_is, std::ostream& sequence_os) {
             for(std::string line; std::getline(fasta_is, line);) {

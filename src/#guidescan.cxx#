@@ -6,7 +6,7 @@
 #include "cxxopts.hpp"
 #include "genome_index.hpp"
 #include "seq_io.hpp"
-#include "process.hpp"
+#include "kmer.hpp"
 
 cxxopts::Options create_options() {
     cxxopts::Options options("guidescan", "Guidescan interface for gRNA database generation.");
@@ -38,6 +38,18 @@ bool file_exists(const std::string& fileName)
 int main(int argc, char *argv[])
 {
     using namespace std;
+
+    istringstream sequence_stream("");
+    genomics::kmer_producer kmerp(sequence_stream, 6, string("NGG"));
+
+    cout << "HERE" << endl;
+    genomics::kmer k;
+    while (kmerp.get_next_kmer(k)) {
+        cout << k.sequence << endl;
+        cout << k.absolute_position << endl;
+    }
+
+    return 0;
 
     auto options = create_options();
 
@@ -108,7 +120,7 @@ int main(int argc, char *argv[])
 
     genomics::genome_index<sdsl::wt_huff<>, 32, 8192> gi(fm_index, gs);
     cout << "Successfully loaded index." << endl;
-
+                     
     vector<thread> threads;
     for (int i = 0; i < nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<sdsl::wt_huff<>, 32, 8192>,
