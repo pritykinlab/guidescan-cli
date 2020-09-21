@@ -8,18 +8,10 @@
 #include <ostream>
 #include <functional>
 
-#include "genome_index.hpp"
+#include "genomics/index.hpp"
+#include "genomics/structures.hpp"
 
 namespace genomics {
-    enum class direction {positive, negative};
-
-    struct kmer {
-        std::string sequence;
-        std::string pam;
-        size_t absolute_position;
-        direction dir;
-    };
-
     /* 
        A producer class for kmers built on top of std::istream. Returns
        the next kmer available if it can find one.

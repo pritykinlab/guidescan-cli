@@ -1,42 +1,13 @@
 #include <ostream>
 #include <functional>
 
-#include "kmer.hpp"
+#include "genomics/kmer.hpp"
+#include "genomics/sequences.hpp"
 
 namespace genomics {
-    namespace  {
-        bool pam_matches(const std::string& kmer,
-                         const std::string& pam) {
-            for (size_t i = 0; i < pam.length(); i++) {
-                if (pam[i] == 'N') continue;
-                if (kmer[kmer.length() - pam.length() + i] != pam[i]) return false;
-            }
-
-            return true;
-        }
-
-        std::string complement_strand(const std::string& kmer) {
-            std::string s;
-            for (int i = kmer.length() - 1; i >= 0; i--) {
-                char c = kmer[i];
-
-                switch (kmer[i]) {
-                case 'A': c = 'T'; break;
-                case 'T': c = 'A'; break;
-                case 'C': c = 'G'; break;
-                case 'G': c = 'C'; break;
-                }
-
-                s += c;
-            }
-
-            return s;
-        }
-    };
-
     kmer_producer::kmer_producer(std::istream& sequence, size_t k, const std::string &pam)
-        : sequence(sequence), pam(pam), buffer_len(k + pam.length()),
-          k(k), kmer_buffer(buffer_len)
+        : sequence(sequence), pam(pam),
+          buffer_len(k + pam.length()), k(k), kmer_buffer(buffer_len)
     {}
 
     size_t kmer_producer::get_next_kmer(kmer& out_kmer) {
@@ -52,7 +23,7 @@ namespace genomics {
         if (!sequence) return 0;
 
         std::string kmer_str(kmer_buffer.data());
-        std::string kmer_str_c = complement_strand(kmer_str);
+        std::string kmer_str_c = reverse_complement(kmer_str);
 
         if (pam_matches(kmer_str, pam)) {
             kmer kmer = {kmer_str.substr(0, k),

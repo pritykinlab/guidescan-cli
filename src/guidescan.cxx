@@ -4,9 +4,9 @@
 #include <sdsl/suffix_arrays.hpp>
 
 #include "cxxopts.hpp"
-#include "genome_index.hpp"
-#include "seq_io.hpp"
-#include "process.hpp"
+#include "genomics/index.hpp"
+#include "genomics/seq_io.hpp"
+#include "genomics/process.hpp"
 
 cxxopts::Options create_options() {
     cxxopts::Options options("guidescan", "Guidescan interface for gRNA database generation.");
@@ -38,7 +38,7 @@ bool file_exists(const std::string& fileName)
 int main(int argc, char *argv[])
 {
     using namespace std;
-
+    
     auto options = create_options();
 
     string fasta_file, pam;

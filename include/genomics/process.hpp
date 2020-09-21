@@ -1,7 +1,8 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
-#include "kmer.hpp"
+#include "genomics/kmer.hpp"
+#include "genomics/sequences.hpp"
 
 namespace genomics {
     namespace {
@@ -17,15 +18,32 @@ namespace genomics {
     void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                                 const kmer& k,
                                 std::ostream& output) {
-        // if (sdsl::count(gi.csa, kmer.begin(), kmer.end()) > 1) return;
 
-        // std::vector<size_t> off_targets(4);
-        // gi.inexact_search(kmer.begin(), kmer.end(), 3, callback, off_targets);
+        coordinates coords = resolve_absolute(gi.gs, k.absolute_coords);
 
-        // output << kmer << " 1-" << off_targets[1] << ":2-" << off_targets[2]
-        //        << ":3-" << off_targets[3] << std::endl; // race condition if multithreading
+        if (coords.chr.length < 10000) {
+            return;
+        }
+
+        std::string kmer_pos;
+        std::string kmer_neg;
+
+        kmer_pos = k.sequence + k.pam;
+        kmer_neg = reverse_complement(kmer_pos);
+
+        if (sdsl::count(gi.csa, kmer_pos.begin(), kmer_pos.end()) > 1) return;
+        if (sdsl::count(gi.csa, kmer_neg.begin(), kmer_neg.end()) > 1) return;
+
+        std::vector<size_t> off_targets(4);
+        gi.inexact_search(kmer_neg.begin(), kmer_neg.end(), 3, callback, off_targets);
+        gi.inexact_search(kmer_pos.begin(), kmer_pos.end(), 3, callback, off_targets);
+
+        if (off_targets[1] > 0) return;
+
         output << k.sequence << k.pam << ":"
-               << (k.dir == direction::positive ? "+" : "-") << std::endl;
+               << (k.dir == direction::positive ? "+" : "-")
+               << " 1-" << off_targets[1] << ":2-" << off_targets[2]
+               << ":3-" << off_targets[3] << std::endl; // race condition if multithreading
     }
 
     /* Processes the kmers in the file, collecting all information
@@ -45,7 +63,8 @@ namespace genomics {
         kmer out_kmer;
         for (size_t idx = 0; kmer_p.get_next_kmer(out_kmer); idx++) {
             if ((idx - start_position) % step_size != 0) continue;
-            process_kmer_to_stream(gi, out_kmer, output);
+            output << out_kmer.sequence << out_kmer.pam << std::endl;
+            //process_kmer_to_stream(gi, out_kmer, output);
         }
     }
 }

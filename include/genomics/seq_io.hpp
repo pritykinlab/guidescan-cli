@@ -6,7 +6,7 @@
 #include <istream> 
 #include <ostream> 
 
-#include "genome_index.hpp"
+#include "genomics/index.hpp"
 
 // TODO: Handle error cases
 namespace genomics {

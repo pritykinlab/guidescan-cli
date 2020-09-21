@@ -2,7 +2,7 @@
 #include <iostream>
 #include <algorithm>
 
-#include "seq_io.hpp"
+#include "genomics/seq_io.hpp"
 
 namespace genomics {
     namespace seq_io {
@@ -45,31 +45,33 @@ namespace genomics {
         genome_structure parse_genome_structure(std::istream& fasta_is) {
             genome_structure gs;
 
-            std::string header;
-            std::getline(fasta_is, header);
-            if (header.size() < 1 || header[0] != '>') {
+            std::string line;
+            std::getline(fasta_is, line);
+            if (line.size() < 1 || line[0] != '>') {
                 return gs;
             }
 
-            header = header.substr(1);
-            ltrim(header);
-            rtrim(header);
-            size_t offset = 0;
+            line = line.substr(1);
+            ltrim(line);
+            rtrim(line);
+            size_t length = 0;
         
             for(std::string line; std::getline(fasta_is, line); ) {
                 if (line[0] == '>') {
-                    gs.push_back(std::make_tuple(header, offset));
-                    header = line.substr(1);
-                    ltrim(header);
-                    rtrim(header);
-                    offset = 0;
+                    chromosome c = {line, length};
+                    gs.push_back(c);
+                    line = line.substr(1);
+                    ltrim(line);
+                    rtrim(line);
+                    length = 0;
                     continue;
                 }
 
-                offset += line.length();
+                length += line.length();
             }
 
-            gs.push_back(std::make_tuple(header, offset));
+            chromosome c = {line, length};
+            gs.push_back(c);
 
             return gs;
         }
@@ -79,9 +81,9 @@ namespace genomics {
             fs.open(filename);
         
             for (auto p : gs) {
-                fs << std::get<0>(p);
+                fs << p.name;
                 fs << "\n";
-                fs << std::get<1>(p);
+                fs << p.length;
                 fs << "\n";
             }
         }
@@ -92,16 +94,17 @@ namespace genomics {
             if (!fs) return false;
         
             while (fs) {
-                std::string chromosone, length_str;
-                std::getline(fs, chromosone);
+                std::string name, length_str;
+                std::getline(fs, name);
                 std::getline(fs, length_str);
 
-                if (chromosone.length() == 0 || length_str.length() == 0) {
+                if (name.length() == 0 || length_str.length() == 0) {
                     break;
                 }
 
                 size_t length = std::stoll(length_str);
-                gs.push_back(std::make_tuple(chromosone, length));
+                chromosome c = {name, length};
+                gs.push_back(c);
             }
 
             return true;
