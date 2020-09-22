@@ -6,11 +6,17 @@
 
 namespace genomics {
     namespace {
+        void off_target_enumerator(size_t sp, size_t ep, size_t k,
+                                   std::vector<std::tuple<size_t, size_t>> &off_targets) {
+            if (k == 1) off_targets.push_back(std::make_tuple(sp, ep));
+        }
+
         void off_target_counter(size_t sp, size_t ep, size_t k,
                                 std::vector<size_t> &off_targets) {
             off_targets[k] += ep - sp + 1;
         }
 
+        std::function<void(size_t, size_t, size_t, std::vector<std::tuple<size_t, size_t>>&)> callback_enum = off_target_enumerator;
         std::function<void(size_t, size_t, size_t, std::vector<size_t>&)> callback = off_target_counter;
     };
 
@@ -25,25 +31,21 @@ namespace genomics {
             return;
         }
 
-        std::string kmer_pos;
-        std::string kmer_neg;
+        std::string kmer_pos = k.sequence + k.pam;
+        std::string kmer_neg = reverse_complement(kmer_pos);
 
-        kmer_pos = k.sequence + k.pam;
-        kmer_neg = reverse_complement(kmer_pos);
+        std::vector<size_t> off_targets(4, 0);
+        gi.inexact_search(kmer_pos, k.pam.length(), false, 3, callback, off_targets);
+        gi.inexact_search(kmer_neg, k.pam.length(), true, 3, callback, off_targets);
 
-        if (sdsl::count(gi.csa, kmer_pos.begin(), kmer_pos.end()) > 1) return;
-        if (sdsl::count(gi.csa, kmer_neg.begin(), kmer_neg.end()) > 1) return;
-
-        std::vector<size_t> off_targets(4);
-        gi.inexact_search(kmer_neg.begin(), kmer_neg.end(), 3, callback, off_targets);
-        gi.inexact_search(kmer_pos.begin(), kmer_pos.end(), 3, callback, off_targets);
-
+        if (off_targets[0] > 1) return;
         if (off_targets[1] > 0) return;
 
         output << k.sequence << k.pam << ":"
                << (k.dir == direction::positive ? "+" : "-")
                << " 1-" << off_targets[1] << ":2-" << off_targets[2]
                << ":3-" << off_targets[3] << std::endl; // race condition if multithreading
+
     }
 
     /* Processes the kmers in the file, collecting all information
@@ -58,13 +60,10 @@ namespace genomics {
                                  size_t step_size) {
         std::ifstream sequence(raw_sequence_file);
         kmer_producer kmer_p(sequence, k, pam);
-
-
         kmer out_kmer;
         for (size_t idx = 0; kmer_p.get_next_kmer(out_kmer); idx++) {
             if ((idx - start_position) % step_size != 0) continue;
-            output << out_kmer.sequence << out_kmer.pam << std::endl;
-            //process_kmer_to_stream(gi, out_kmer, output);
+            process_kmer_to_stream(gi, out_kmer, output);
         }
     }
 }
