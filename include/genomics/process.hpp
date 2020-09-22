@@ -42,16 +42,15 @@ namespace genomics {
        about off targets and outputting it to a stream in SAM format. */
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
-                                 const std::string& raw_sequence_file,
-                                 size_t k, const std::string& pam,
-                                 std::ostream& output, std::mutex& output_mtx,
-                                 size_t start_position,
-                                 size_t step_size) {
-        std::ifstream sequence(raw_sequence_file);
-        kmer_producer kmer_p(sequence, k, pam);
+				 genomics::kmer_producer &kmer_p, std::mutex& kmer_mtx,
+                                 std::ostream& output, std::mutex& output_mtx) {
         kmer out_kmer;
-        for (size_t idx = 0; kmer_p.get_next_kmer(out_kmer); idx++) {
-            if ((idx - start_position) % step_size != 0) continue;
+        while (true) {
+	    kmer_mtx.lock();
+	    bool kmers_left = kmer_p.get_next_kmer(out_kmer);
+	    kmer_mtx.unlock();
+
+	    if (!kmers_left) break;
             process_kmer_to_stream(gi, out_kmer, output, output_mtx);
         }
     }

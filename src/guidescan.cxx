@@ -148,12 +148,17 @@ int do_build_cmd(const build_cmd_options& opts) {
     ofstream output(opts.database_file);
     genomics::write_sam_header(output, gi.gs);
 
+    genomics::seq_kmer_producer kmer_p(raw_sequence_file, opts.kmer_length, opts.pam);
+
     std::mutex output_mtx;
+    std::mutex kmer_mtx;
+
     vector<thread> threads;
     for (int i = 0; i < opts.nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<sdsl::wt_huff<>, 32, 8192>,
-                 cref(gi), cref(raw_sequence_file), opts.kmer_length, opts.pam, ref(output),
-                 ref(output_mtx), i, opts.nthreads);
+                 cref(gi),
+		 ref(kmer_p), ref(kmer_mtx),
+		 ref(output), ref(output_mtx));
         threads.push_back(move(t));
     }
 

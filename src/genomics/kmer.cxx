@@ -5,22 +5,26 @@
 #include "genomics/sequences.hpp"
 
 namespace genomics {
-    kmer_producer::kmer_producer(std::istream& sequence, size_t k, const std::string &pam)
-        : sequence(sequence), pam(pam),
-          buffer_len(k + pam.length()), k(k), kmer_buffer(buffer_len)
-    {}
+    seq_kmer_producer::seq_kmer_producer(const std::string& sequence_file, size_t k, const std::string &pam)
+        : sequence(new std::ifstream(sequence_file)),
+	  pam(pam),
+	  buffer_len(k + pam.length()),
+	  k(k),
+	  kmer_buffer(buffer_len)
+    {
+    }
 
-    size_t kmer_producer::get_next_kmer(kmer& out_kmer) {
+    size_t seq_kmer_producer::get_next_kmer(kmer& out_kmer) {
         if (!kmer_queue.empty()) {
             out_kmer = kmer_queue.front();
             kmer_queue.pop();
             return 1;
         }
 
-        sequence.seekg(stream_position, std::ios_base::beg);
-        sequence.read(kmer_buffer.data(), buffer_len);
+        sequence->seekg(stream_position, std::ios_base::beg);
+        sequence->read(kmer_buffer.data(), buffer_len);
 
-        if (!sequence) return 0;
+        if (!(*sequence)) return 0;
 
         std::string kmer_str(kmer_buffer.data());
         std::string kmer_str_c = reverse_complement(kmer_str);
