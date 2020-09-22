@@ -23,7 +23,8 @@ namespace genomics {
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                                 const kmer& k,
-                                std::ostream& output) {
+                                std::ostream& output,
+				std::mutex& output_mtx) {
 
         coordinates coords = resolve_absolute(gi.gs, k.absolute_coords);
 
@@ -41,10 +42,12 @@ namespace genomics {
         if (off_targets[0] > 1) return;
         if (off_targets[1] > 0) return;
 
+	output_mtx.lock();
         output << k.sequence << k.pam << ":"
                << (k.dir == direction::positive ? "+" : "-")
                << " 1-" << off_targets[1] << ":2-" << off_targets[2]
                << ":3-" << off_targets[3] << std::endl; // race condition if multithreading
+	output_mtx.unlock();
 
     }
 
@@ -55,7 +58,7 @@ namespace genomics {
                                  const std::string& raw_sequence_file,
                                  size_t k,
                                  const std::string& pam,
-                                 std::ostream& output,
+                                 std::ostream& output, std::mutex& output_mtx,
                                  size_t start_position,
                                  size_t step_size) {
         std::ifstream sequence(raw_sequence_file);
@@ -63,7 +66,7 @@ namespace genomics {
         kmer out_kmer;
         for (size_t idx = 0; kmer_p.get_next_kmer(out_kmer); idx++) {
             if ((idx - start_position) % step_size != 0) continue;
-            process_kmer_to_stream(gi, out_kmer, output);
+            process_kmer_to_stream(gi, out_kmer, output, output_mtx);
         }
     }
 }
