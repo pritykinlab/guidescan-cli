@@ -1,6 +1,10 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <sstream>
+#include <vector>
+#include <iterator>
+
 
 #include "genomics/seq_io.hpp"
 
@@ -23,6 +27,21 @@ namespace genomics {
             {
                 return static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
             }
+
+	    template <typename Out>
+	    void split(const std::string &s, char delim, Out result) {
+		std::istringstream iss(s);
+		std::string item;
+		while (std::getline(iss, item, delim)) {
+		    *result++ = item;
+		}
+	    }
+
+	    std::vector<std::string> split(const std::string &s, char delim) {
+		std::vector<std::string> elems;
+		split(s, delim, std::back_inserter(elems));
+		return elems;
+	    }
 
             void convert_raw_sequence(std::string& seq) {
                 ltrim(seq);
@@ -54,6 +73,8 @@ namespace genomics {
             line = line.substr(1);
             ltrim(line);
             rtrim(line);
+	    auto words = split(line, ' ');
+	    line = words[0];
             size_t length = 0;
         
             for(std::string line; std::getline(fasta_is, line); ) {
@@ -63,6 +84,8 @@ namespace genomics {
                     line = line.substr(1);
                     ltrim(line);
                     rtrim(line);
+		    auto words = split(line, ' ');
+		    line = words[0];
                     length = 0;
                     continue;
                 }

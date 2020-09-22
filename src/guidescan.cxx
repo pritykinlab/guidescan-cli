@@ -5,6 +5,7 @@
 
 #include "CLI/CLI.hpp"
 #include "genomics/index.hpp"
+#include "genomics/sam.hpp"
 #include "genomics/seq_io.hpp"
 #include "genomics/process.hpp"
 
@@ -144,13 +145,14 @@ int do_build_cmd(const build_cmd_options& opts) {
 	// Create new kmers source...
     }
 
-    ofstream output_file(opts.database_file);
+    ofstream output(opts.database_file);
+    genomics::write_sam_header(output, gi.gs);
 
     std::mutex output_mtx;
     vector<thread> threads;
     for (int i = 0; i < opts.nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<sdsl::wt_huff<>, 32, 8192>,
-                 cref(gi), cref(raw_sequence_file), opts.kmer_length, opts.pam, ref(output_file),
+                 cref(gi), cref(raw_sequence_file), opts.kmer_length, opts.pam, ref(output),
                  ref(output_mtx), i, opts.nthreads);
         threads.push_back(move(t));
     }
