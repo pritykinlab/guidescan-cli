@@ -144,9 +144,7 @@ namespace genomics {
 
 	if (!no_off_targets) {
 	    std::string ots = off_target_string(gi.gs, off_targets);
-	    if (ots != "") {
-		samline += "\tof:H:" + ots;
-	    }
+	    samline += "\tof:H:" + ots;
 	}
 
 	os << samline << std::endl;

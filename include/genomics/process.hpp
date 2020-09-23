@@ -1,6 +1,7 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
+#include <set>
 #include <tuple>
 
 #include "genomics/kmer.hpp"
@@ -10,32 +11,44 @@
 namespace genomics {
     namespace {
         void off_target_enumerator(size_t sp, size_t ep, size_t k,
-				   std::vector<std::vector<std::tuple<size_t, size_t>>> &off_targets) {
-            off_targets[k].push_back(std::make_tuple(sp, ep));
+				   std::vector<std::set<std::tuple<size_t, size_t>>> &off_targets_bwt) {
+            off_targets_bwt[k].insert(std::make_tuple(sp, ep));
         }
 
-        std::function<void(size_t, size_t, size_t, std::vector<std::vector<std::tuple<size_t, size_t>>>&)> callback = off_target_enumerator;
+        std::function<void(size_t, size_t, size_t, std::vector<std::set<std::tuple<size_t, size_t>>>&)> callback = off_target_enumerator;
+
+	size_t count_off_targets(size_t k, const std::vector<std::set<std::tuple<size_t, size_t>>> &off_targets_bwt) {
+	    size_t count = 0;
+	    for (const auto& sp_ep : off_targets_bwt[k]) {
+		size_t sp = std::get<0>(sp_ep);
+		size_t ep = std::get<1>(sp_ep);
+		count += ep - sp + 1;
+	    }
+	    return count;
+	}
     };
 
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
+				const std::vector<std::string> &pams, size_t mismatches,
                                 const kmer& k,
                                 std::ostream& output,
 				std::mutex& output_mtx) {
-
         coordinates coords = resolve_absolute(gi.gs, k.absolute_coords);
 
-        std::string kmer_pos = k.sequence + k.pam;
-        std::string kmer_neg = reverse_complement(kmer_pos);
+	std::vector<std::set<std::tuple<size_t, size_t>>> off_targets_bwt(mismatches + 1);
+	for (const auto& pam : pams) {
+	    std::string kmer_pos = k.sequence + pam;
+	    std::string kmer_neg = reverse_complement(kmer_pos);
 
-        std::vector<std::vector<std::tuple<size_t, size_t>>> off_targets_bwt(4);
-        gi.inexact_search(kmer_pos, k.pam.length(), false, 3, callback, off_targets_bwt);
-        if (off_targets_bwt[0].size() > 1 || off_targets_bwt[1].size() > 0) return;
-        gi.inexact_search(kmer_neg, k.pam.length(), true, 3, callback, off_targets_bwt);
-        if (off_targets_bwt[0].size() > 1 || off_targets_bwt[1].size() > 0) return;
+	    gi.inexact_search(kmer_pos, pam.length(), false, mismatches, callback, off_targets_bwt);
+	    if (count_off_targets(0, off_targets_bwt) > 1 || count_off_targets(1, off_targets_bwt) > 0) return;
+	    gi.inexact_search(kmer_neg, pam.length(), true, mismatches, callback, off_targets_bwt);
+	    if (count_off_targets(0, off_targets_bwt) > 1 || count_off_targets(1, off_targets_bwt) > 0) return;
+	}
 
-        std::vector<std::vector<size_t>> off_targets(3);
-	for (int i = 0; i < 3; i++) {
+	std::vector<std::vector<size_t>> off_targets(mismatches);
+	for (int i = 0; i < mismatches; i++) {
 	    for (const auto& sp_ep : off_targets_bwt[i + 1]) {
 		size_t sp = std::get<0>(sp_ep);
 		size_t ep = std::get<1>(sp_ep);
@@ -54,6 +67,7 @@ namespace genomics {
        about off targets and outputting it to a stream in SAM format. */
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
+				 const std::vector<std::string> &pams, size_t mismatches,
 				 std::unique_ptr<genomics::kmer_producer>& kmer_p, std::mutex& kmer_mtx,
                                  std::ostream& output, std::mutex& output_mtx) {
         kmer out_kmer;
@@ -63,7 +77,7 @@ namespace genomics {
 	    kmer_mtx.unlock();
 
 	    if (!kmers_left) break;
-            process_kmer_to_stream(gi, out_kmer, output, output_mtx);
+	    process_kmer_to_stream(gi, pams, mismatches, out_kmer, output, output_mtx);
         }
     }
 }

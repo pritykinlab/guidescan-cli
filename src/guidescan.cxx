@@ -15,6 +15,9 @@ struct build_cmd_options {
     size_t kmer_length;
     CLI::Option* kmer_length_opt;
 
+    size_t mismatches;
+    CLI::Option* mismatches_opt;
+    
     size_t nthreads;
     CLI::Option* nthreads_opt;
 
@@ -55,15 +58,17 @@ CLI::App* build_cmd(CLI::App &guidescan, build_cmd_options& opts) {
     opts.nthreads    = std::thread::hardware_concurrency();
     opts.pam         = std::string("NGG");
     opts.alt_pams    = {std::string("NAG")};
+    opts.mismatches  = 3;
 
     opts.kmer_length_opt = build->add_option("-k,--kmer-length", opts.kmer_length, "Length of kmers excluding the PAM", true);
+    opts.nthreads_opt    = build->add_option("-n,--threads", opts.nthreads, "Number of threads to parallelize over", true);
+    opts.pam_opt         = build->add_option("-p,--pam", opts.pam, "Main PAM to generate gRNAs and find off-targets", true);
+    opts.alt_pams_opt    = build->add_option("-a,--alt-pam", opts.alt_pams, "Alternative PAMs used to find off-targets", true);
+    opts.mismatches_opt  = build->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
     opts.kmers_file_opt  = build->add_option("-f,--kmers-file", opts.kmers_file,
 					     "File containing kmers to build gRNA database"
 					     " over, if not specified, will generate the database over all kmers with the given PAM")
 	->check(CLI::ExistingFile);
-    opts.nthreads_opt    = build->add_option("-n,--threads", opts.nthreads, "Number of threads to parallelize over", true);
-    opts.pam_opt         = build->add_option("-p,--pam", opts.pam, "Main PAM to generate gRNAs and find off-targets", true);
-    opts.alt_pams_opt    = build->add_option("-a,--alt-pam", opts.alt_pams, "Alternative PAMs used to find off-targets", true);
     opts.fasta_file_opt  = build->add_option("genome", opts.fasta_file, "Genome in FASTA format")
 	->check(CLI::ExistingFile)
 	->required();
@@ -77,7 +82,6 @@ CLI::App* kmer_cmd(CLI::App &guidescan, kmer_cmd_options& opts) {
     auto kmers = guidescan.add_subcommand("kmers",
 					  "Generates a list of kmers for a specific PAM written and"
 					  " writes them to stdout.");
-
     opts.kmer_length = 20;
     opts.pam         = std::string("NGG");
 
@@ -155,7 +159,6 @@ int do_build_cmd(const build_cmd_options& opts) {
     genomics::genome_index<sdsl::wt_huff<>, 32, 8192> gi(fm_index, gs);
     cout << "Successfully loaded index." << endl;
 
-
     ofstream output(opts.database_file);
     genomics::write_sam_header(output, gi.gs);
 
@@ -170,10 +173,13 @@ int do_build_cmd(const build_cmd_options& opts) {
     std::mutex output_mtx;
     std::mutex kmer_mtx;
 
+    std::vector<std::string> pams = opts.alt_pams;
+    pams.push_back(opts.pam);
+
     vector<thread> threads;
     for (int i = 0; i < opts.nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<sdsl::wt_huff<>, 32, 8192>,
-                 cref(gi),
+                 cref(gi), cref(pams), opts.mismatches,
 		 ref(kmer_p), ref(kmer_mtx),
 		 ref(output), ref(output_mtx));
         threads.push_back(move(t));
