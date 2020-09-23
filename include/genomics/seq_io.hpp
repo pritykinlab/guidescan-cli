@@ -20,8 +20,15 @@ namespace genomics {
            within the genome */
         genome_structure parse_genome_structure(std::istream& fasta_is);
 
+	/* Parses a kmer from an input stream, returning 1 on success,
+	   0 otherwise. */
+	size_t parse_kmer(std::istream& kmers_stream, kmer& out_kmer);
+
         void write_to_file(const genome_structure& gs, const std::string& filename);
         bool load_from_file(genome_structure& gs, const std::string& filename);
+
+	void write_to_file(const std::vector<kmer>& kmers, const std::string& filename);
+	bool load_from_file(std::vector<kmer>& kmers, const std::string& filename);
     };
 };
 

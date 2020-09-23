@@ -56,6 +56,26 @@ namespace genomics {
         size_t get_next_kmer(kmer& out_kmer);
     };
 
+    /* 
+       A kmer_producer constructed on top of a kmers file that contains a
+       list of kmers seperated by newlines.
+    */
+    class kmers_file_producer : public kmer_producer {
+    private:
+	std::unique_ptr<std::istream> kmers_stream;
+    public:
+        kmers_file_producer(const std::string& kmers_file);
+        kmers_file_producer() = delete;
+
+        /* 
+           Gets the next available kmer, returning 1 on success and 0
+           if the stream is no longer valid for any reason
+           (eofbit/badbit/failbit). 
+        */
+        size_t get_next_kmer(kmer& out_kmer);
+    };
+
+
 };
 
 #endif /* KMER_H */

@@ -1,5 +1,6 @@
 #include <thread>
 #include <istream>
+#include <memory>
 
 #include <sdsl/suffix_arrays.hpp>
 
@@ -8,6 +9,13 @@
 #include "genomics/sam.hpp"
 #include "genomics/seq_io.hpp"
 #include "genomics/process.hpp"
+#include "genomics/kmer.hpp"
+
+template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args)
+{
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
 
 bool file_exists(const std::string& fileName)
 {
@@ -42,6 +50,9 @@ struct kmer_cmd_options {
     size_t kmer_length;
     CLI::Option* kmer_length_opt;
 
+    std::string kmers_file;
+    CLI::Option* kmers_file_opt;
+
     std::string fasta_file;
     CLI::Option* fasta_file_opt;
 
@@ -69,7 +80,6 @@ CLI::App* build_cmd(CLI::App &guidescan, build_cmd_options& opts) {
 	->check(CLI::ExistingFile)
 	->required();
     opts.database_file_opt = build->add_option("-o, --output", opts.database_file, "Output database file.")
-	->check(CLI::ExistingPath)
 	->required();
   
     return build;
@@ -87,6 +97,8 @@ CLI::App* kmer_cmd(CLI::App &guidescan, kmer_cmd_options& opts) {
     opts.pam_opt         = kmers->add_option("-p,--pam", opts.pam, "PAM to generate kmers for", true);
     opts.fasta_file_opt  = kmers->add_option("genome", opts.fasta_file, "Genome in FASTA format")
 	->check(CLI::ExistingFile)
+	->required();
+    opts.kmers_file_opt  = kmers->add_option("-o, --output", opts.kmers_file, "Output kmers file.")
 	->required();
 
     return kmers;
@@ -106,6 +118,7 @@ int do_build_cmd(const build_cmd_options& opts) {
         return 1;
     }
 
+    cout << "Reading sequence file..." << endl;
     if (!file_exists(raw_sequence_file)) {
         ofstream os(raw_sequence_file);
         if (!os) {
@@ -118,6 +131,7 @@ int do_build_cmd(const build_cmd_options& opts) {
         genomics::seq_io::parse_sequence(fasta_is, os);
     }
 
+    cout << "Loading genome index..." << endl;
     genomics::genome_structure gs;
     if (!genomics::seq_io::load_from_file(gs, genome_structure_file)) {
         cout << "No genome structure file \"" << genome_structure_file
@@ -141,14 +155,17 @@ int do_build_cmd(const build_cmd_options& opts) {
     genomics::genome_index<sdsl::wt_huff<>, 32, 8192> gi(fm_index, gs);
     cout << "Successfully loaded index." << endl;
 
-    if (opts.kmers_file_opt->count() > 0) {
-	// Create new kmers source...
-    }
 
     ofstream output(opts.database_file);
     genomics::write_sam_header(output, gi.gs);
 
-    genomics::seq_kmer_producer kmer_p(raw_sequence_file, opts.kmer_length, opts.pam);
+    std::unique_ptr<genomics::kmer_producer> kmer_p;
+
+    if (opts.kmers_file_opt->count() > 0) {
+	kmer_p = make_unique<genomics::kmers_file_producer>(opts.kmers_file);
+    } else {
+	kmer_p = make_unique<genomics::seq_kmer_producer>(raw_sequence_file, opts.kmer_length, opts.pam);
+    }
 
     std::mutex output_mtx;
     std::mutex kmer_mtx;
@@ -181,6 +198,7 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
         return 1;
     }
 
+    cout << "Reading sequence file..." << endl;
     if (!file_exists(raw_sequence_file)) {
         ofstream os(raw_sequence_file);
         if (!os) {
@@ -193,6 +211,18 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
         genomics::seq_io::parse_sequence(fasta_is, os);
     }
 
+    cout << "Loading kmers from sequence..." << endl;
+    genomics::seq_kmer_producer kmer_p(raw_sequence_file, opts.kmer_length, opts.pam);
+
+    genomics::kmer k;
+    vector<genomics::kmer> kmers;
+
+    while(kmer_p.get_next_kmer(k)) {
+	kmers.push_back(k);
+    }
+    
+    cout << "Writing kmers to file..." << endl;
+    genomics::seq_io::write_to_file(kmers, opts.kmers_file);
 
     return 0;
 }
@@ -200,6 +230,7 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
 int main(int argc, char *argv[])
 {
     CLI::App guidescan("Guidescan all-in-one interface.\n");
+    guidescan.failure_message(CLI::FailureMessage::help);
 
     build_cmd_options build_opts;
     kmer_cmd_options kmer_opts;
@@ -209,8 +240,12 @@ int main(int argc, char *argv[])
 
     guidescan.require_subcommand(1);
 
-    CLI11_PARSE(guidescan, argc, argv);
-
+    try {
+	guidescan.parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+	return guidescan.exit(e);
+    }
+    
     if (guidescan.got_subcommand("kmers")) {
 	return do_kmers_cmd(kmer_opts);
     }

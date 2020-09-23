@@ -3,6 +3,7 @@
 
 #include "genomics/kmer.hpp"
 #include "genomics/sequences.hpp"
+#include "genomics/seq_io.hpp"
 
 namespace genomics {
     seq_kmer_producer::seq_kmer_producer(const std::string& sequence_file, size_t k, const std::string &pam)
@@ -47,5 +48,14 @@ namespace genomics {
 
         stream_position++;
         return get_next_kmer(out_kmer); // Keep reading until EOF or error occurs.
+    }
+
+
+    kmers_file_producer::kmers_file_producer(const std::string& kmers_file)
+	: kmers_stream(new std::ifstream(kmers_file))
+    {}
+    
+    size_t kmers_file_producer::get_next_kmer(kmer& out_kmer) {
+	return seq_io::parse_kmer(*kmers_stream, out_kmer);
     }
 };

@@ -132,5 +132,48 @@ namespace genomics {
 
             return true;
         }
+
+	void write_to_file(const std::vector<kmer>& kmers, const std::string& filename) {
+            std::ofstream fs;
+            fs.open(filename);
+        
+            for (auto kmer : kmers) {
+                fs << kmer.sequence << " ";
+                fs << kmer.pam << " ";
+                fs << kmer.absolute_coords << " ";
+                fs << (kmer.dir == direction::positive ? "+" : "-") << std::endl;
+            }
+	}
+
+	size_t parse_kmer(std::istream& kmers_stream, kmer& out_kmer) {
+	    if (!kmers_stream) return 0;
+
+	    std::string line;
+	    std::getline(kmers_stream, line);
+	    auto words = split(line, ' ');
+
+	    if (words.size() < 4) return 0;
+
+	    std::istringstream iss(words[2]);
+	    size_t coords;
+	    iss >> coords;
+
+	    direction dir = (words[3] == "+") ? direction::positive : direction::negative;
+	    out_kmer = {words[0], words[1], coords, dir};
+	    return 1;
+	}
+
+	bool load_from_file(std::vector<kmer>& kmers, const std::string& filename) {
+	    std::ifstream fs(filename);
+
+            if (!fs) return false;
+        
+	    kmer k;
+            while (parse_kmer(fs, k)) {
+		kmers.push_back(k);
+	    }
+
+	    return true;
+	}
     }; 
 };
