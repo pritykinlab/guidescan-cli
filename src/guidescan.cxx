@@ -11,18 +11,6 @@
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"
 
-template<typename T, typename... Args>
-std::unique_ptr<T> make_unique(Args&&... args)
-{
-    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
-bool file_exists(const std::string& fileName)
-{
-    std::ifstream infile(fileName);
-    return infile.good();
-}
-
 struct build_cmd_options {
     size_t kmer_length;
     CLI::Option* kmer_length_opt;
@@ -102,6 +90,18 @@ CLI::App* kmer_cmd(CLI::App &guidescan, kmer_cmd_options& opts) {
 	->required();
 
     return kmers;
+}
+
+template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args)
+{
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+bool file_exists(const std::string& fileName)
+{
+    std::ifstream infile(fileName);
+    return infile.good();
 }
 
 int do_build_cmd(const build_cmd_options& opts) {
@@ -226,10 +226,10 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
 
     return 0;
 }
-
 int main(int argc, char *argv[])
 {
     CLI::App guidescan("Guidescan all-in-one interface.\n");
+    guidescan.require_subcommand(1);
     guidescan.failure_message(CLI::FailureMessage::help);
 
     build_cmd_options build_opts;
@@ -237,8 +237,6 @@ int main(int argc, char *argv[])
 
     build_cmd(guidescan, build_opts);
     kmer_cmd(guidescan, kmer_opts);
-
-    guidescan.require_subcommand(1);
 
     try {
 	guidescan.parse(argc, argv);
