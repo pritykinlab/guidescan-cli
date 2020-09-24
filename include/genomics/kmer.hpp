@@ -37,15 +37,16 @@ namespace genomics {
     private:
 	std::unique_ptr<std::istream> sequence;
         std::string pam;
-        size_t k;
+        genome_structure gs;
+        size_t k, min_chr_length;
 
         size_t stream_position = 0;
-        size_t buffer_len;
         std::vector<char> kmer_buffer;
         std::queue<kmer> kmer_queue;
 
     public:
-        seq_kmer_producer(const std::string& sequence_file, size_t k, const std::string &pam);
+        seq_kmer_producer(const std::string& sequence_file, genome_structure gs,
+                          size_t k, const std::string &pam, size_t min_chr_length);
         seq_kmer_producer() = delete;
 
         /* 

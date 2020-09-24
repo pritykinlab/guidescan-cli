@@ -13,33 +13,39 @@
 
 struct build_cmd_options {
     size_t kmer_length;
-    CLI::Option* kmer_length_opt;
+    CLI::Option* kmer_length_opt = nullptr;
 
     size_t mismatches;
-    CLI::Option* mismatches_opt;
+    CLI::Option* mismatches_opt = nullptr;
     
     size_t nthreads;
-    CLI::Option* nthreads_opt;
+    CLI::Option* nthreads_opt = nullptr;
+
+    size_t chr_length;
+    CLI::Option* chr_length_opt = nullptr;
 
     std::string fasta_file;
-    CLI::Option* fasta_file_opt;
+    CLI::Option* fasta_file_opt = nullptr;
 
     std::string database_file;
-    CLI::Option* database_file_opt;
+    CLI::Option* database_file_opt = nullptr;
 
     std::string kmers_file;
-    CLI::Option* kmers_file_opt;
+    CLI::Option* kmers_file_opt = nullptr;
 
     std::string pam;
-    CLI::Option* pam_opt;
+    CLI::Option* pam_opt = nullptr;
 
     std::vector<std::string> alt_pams;
-    CLI::Option* alt_pams_opt;
+    CLI::Option* alt_pams_opt = nullptr;
 };
 
 struct kmer_cmd_options {
     size_t kmer_length;
     CLI::Option* kmer_length_opt;
+
+    size_t chr_length;
+    CLI::Option* chr_length_opt;
 
     std::string kmers_file;
     CLI::Option* kmers_file_opt;
@@ -59,7 +65,9 @@ CLI::App* build_cmd(CLI::App &guidescan, build_cmd_options& opts) {
     opts.pam         = std::string("NGG");
     opts.alt_pams    = {std::string("NAG")};
     opts.mismatches  = 3;
+    opts.chr_length  = 1000;
 
+    opts.chr_length_opt  = build->add_option("--min-chr-length", opts.chr_length, "Minimum length of chromosomes to consider for gRNAs", true);
     opts.kmer_length_opt = build->add_option("-k,--kmer-length", opts.kmer_length, "Length of kmers excluding the PAM", true);
     opts.nthreads_opt    = build->add_option("-n,--threads", opts.nthreads, "Number of threads to parallelize over", true);
     opts.pam_opt         = build->add_option("-p,--pam", opts.pam, "Main PAM to generate gRNAs and find off-targets", true);
@@ -84,7 +92,9 @@ CLI::App* kmer_cmd(CLI::App &guidescan, kmer_cmd_options& opts) {
 					  " writes them to stdout.");
     opts.kmer_length = 20;
     opts.pam         = std::string("NGG");
+    opts.chr_length  = 1000;
 
+    opts.chr_length_opt  = kmers->add_option("--min-chr-length", opts.chr_length, "Minimum length of chromosone for kmers to be included in output", true);
     opts.kmer_length_opt = kmers->add_option("-k,--kmer-length", opts.kmer_length, "Length of kmers excluding the PAM", true);
     opts.pam_opt         = kmers->add_option("-p,--pam", opts.pam, "PAM to generate kmers for", true);
     opts.fasta_file_opt  = kmers->add_option("genome", opts.fasta_file, "Genome in FASTA format")
@@ -167,7 +177,8 @@ int do_build_cmd(const build_cmd_options& opts) {
     if (opts.kmers_file_opt->count() > 0) {
 	kmer_p = make_unique<genomics::kmers_file_producer>(opts.kmers_file);
     } else {
-	kmer_p = make_unique<genomics::seq_kmer_producer>(raw_sequence_file, opts.kmer_length, opts.pam);
+	kmer_p = make_unique<genomics::seq_kmer_producer>(raw_sequence_file, gs, opts.kmer_length,
+                                                          opts.pam, opts.chr_length);
     }
 
     std::mutex output_mtx;
@@ -196,6 +207,7 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
     using namespace std;
 
     string raw_sequence_file = opts.fasta_file + ".dna";
+    string genome_structure_file = opts.fasta_file + ".gs";
 
     ifstream fasta_is(opts.fasta_file);
     if (!fasta_is) {
@@ -217,8 +229,21 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
         genomics::seq_io::parse_sequence(fasta_is, os);
     }
 
+    cout << "Loading genome index..." << endl;
+    genomics::genome_structure gs;
+    if (!genomics::seq_io::load_from_file(gs, genome_structure_file)) {
+        cout << "No genome structure file \"" << genome_structure_file
+             << "\" located. Building now..." << endl;
+
+        fasta_is.clear();
+        fasta_is.seekg(0);
+        gs = genomics::seq_io::parse_genome_structure(fasta_is);
+        genomics::seq_io::write_to_file(gs, genome_structure_file);
+    }
+
     cout << "Loading kmers from sequence..." << endl;
-    genomics::seq_kmer_producer kmer_p(raw_sequence_file, opts.kmer_length, opts.pam);
+    genomics::seq_kmer_producer kmer_p(raw_sequence_file, gs, opts.kmer_length,
+                                       opts.pam, opts.chr_length);
 
     genomics::kmer k;
     vector<genomics::kmer> kmers;
@@ -241,8 +266,8 @@ int main(int argc, char *argv[])
     build_cmd_options build_opts;
     kmer_cmd_options kmer_opts;
 
-    build_cmd(guidescan, build_opts);
-    kmer_cmd(guidescan, kmer_opts);
+    auto build = build_cmd(guidescan, build_opts);
+    auto kmer  = kmer_cmd(guidescan, kmer_opts);
 
     try {
 	guidescan.parse(argc, argv);

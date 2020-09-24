@@ -6,48 +6,51 @@
 #include "genomics/seq_io.hpp"
 
 namespace genomics {
-    seq_kmer_producer::seq_kmer_producer(const std::string& sequence_file, size_t k, const std::string &pam)
+    seq_kmer_producer::seq_kmer_producer(const std::string& sequence_file, genome_structure gs,
+                                         size_t k, const std::string &pam, size_t min_chr_length)
         : sequence(new std::ifstream(sequence_file)),
+          gs(gs),
+          min_chr_length(min_chr_length),
 	  pam(pam),
-	  buffer_len(k + pam.length()),
 	  k(k),
-	  kmer_buffer(buffer_len)
+	  kmer_buffer(k + pam.length())
     {
     }
 
     size_t seq_kmer_producer::get_next_kmer(kmer& out_kmer) {
-        if (!kmer_queue.empty()) {
-            out_kmer = kmer_queue.front();
-            kmer_queue.pop();
-            return 1;
+        while (kmer_queue.empty()) {
+            sequence->seekg(stream_position, std::ios_base::beg);
+            sequence->read(kmer_buffer.data(), kmer_buffer.size());
+
+            if (!(*sequence)) return 0;
+
+            std::string kmer_str(kmer_buffer.data(), kmer_buffer.size());
+            std::string kmer_str_c = reverse_complement(kmer_str);
+
+            if (pam_matches(kmer_str, pam)) {
+                kmer kmer = {kmer_str.substr(0, k),
+                             pam,
+                             stream_position,
+                             direction::positive};
+                coordinates c = resolve_absolute(gs, kmer.absolute_coords);
+                if (c.chr.length > min_chr_length) kmer_queue.push(kmer);
+            }
+
+            if (pam_matches(kmer_str_c, pam)) {
+                kmer kmer = {kmer_str_c.substr(0, k),
+                             pam,
+                             stream_position,
+                             direction::negative};
+                coordinates c = resolve_absolute(gs, kmer.absolute_coords);
+                if (c.chr.length > min_chr_length) kmer_queue.push(kmer);
+            }
+
+            stream_position++;
         }
 
-        sequence->seekg(stream_position, std::ios_base::beg);
-        sequence->read(kmer_buffer.data(), buffer_len);
-
-        if (!(*sequence)) return 0;
-
-        std::string kmer_str(kmer_buffer.data());
-        std::string kmer_str_c = reverse_complement(kmer_str);
-
-        if (pam_matches(kmer_str, pam)) {
-            kmer kmer = {kmer_str.substr(0, k),
-                         pam,
-                         stream_position,
-                         direction::positive};
-            kmer_queue.push(kmer);
-        }
-
-        if (pam_matches(kmer_str_c, pam)) {
-            kmer kmer = {kmer_str_c.substr(0, k),
-                         pam,
-                         stream_position,
-                         direction::negative};
-            kmer_queue.push(kmer);
-        }
-
-        stream_position++;
-        return get_next_kmer(out_kmer); // Keep reading until EOF or error occurs.
+        out_kmer = kmer_queue.front();
+        kmer_queue.pop();
+        return 1;
     }
 
 
