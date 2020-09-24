@@ -6,6 +6,7 @@
 #include <istream> 
 #include <ostream> 
 
+#include "genomics/kmer.hpp"
 #include "genomics/index.hpp"
 
 // TODO: Handle error cases
@@ -23,6 +24,8 @@ namespace genomics {
 	/* Parses a kmer from an input stream, returning 1 on success,
 	   0 otherwise. */
 	size_t parse_kmer(std::istream& kmers_stream, kmer& out_kmer);
+
+        void write_to_file(kmer_producer& kmer_p, const std::string& filename);
 
         void write_to_file(const genome_structure& gs, const std::string& filename);
         bool load_from_file(genome_structure& gs, const std::string& filename);

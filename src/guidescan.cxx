@@ -245,15 +245,8 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
     genomics::seq_kmer_producer kmer_p(raw_sequence_file, gs, opts.kmer_length,
                                        opts.pam, opts.chr_length);
 
-    genomics::kmer k;
-    vector<genomics::kmer> kmers;
-
-    while(kmer_p.get_next_kmer(k)) {
-	kmers.push_back(k);
-    }
-    
     cout << "Writing kmers to file..." << endl;
-    genomics::seq_io::write_to_file(kmers, opts.kmers_file);
+    genomics::seq_io::write_to_file(kmer_p, opts.kmers_file);
 
     return 0;
 }

@@ -145,6 +145,19 @@ namespace genomics {
             }
 	}
 
+        void write_to_file(kmer_producer& kmer_p, const std::string& filename) {
+            std::ofstream fs;
+            fs.open(filename);
+        
+            kmer kmer;
+            while (kmer_p.get_next_kmer(kmer)) {
+                fs << kmer.sequence << " ";
+                fs << kmer.pam << " ";
+                fs << kmer.absolute_coords << " ";
+                fs << (kmer.dir == direction::positive ? "+" : "-") << std::endl;
+            }
+	}
+
 	size_t parse_kmer(std::istream& kmers_stream, kmer& out_kmer) {
 	    if (!kmers_stream) return 0;
 
