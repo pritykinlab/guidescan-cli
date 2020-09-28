@@ -112,7 +112,7 @@ namespace genomics {
     }
 
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-    void write_sam_line(std::ostream& os, genome_index<t_wt, t_dens, t_inv_dens> gi,
+    std::string get_sam_line(std::ostream& os, genome_index<t_wt, t_dens, t_inv_dens> gi,
 			const kmer& k, const coordinates& coords,
 			const std::vector<std::vector<size_t>>& off_targets) {
 	std::string sequence(k.sequence + k.pam);
@@ -147,7 +147,7 @@ namespace genomics {
 	    samline += "\tof:H:" + ots;
 	}
 
-	os << samline << std::endl;
+        return samline;
     }
 };
 

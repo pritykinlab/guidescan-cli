@@ -16,7 +16,7 @@ target_link_libraries(guidescan PUBLIC sdsl divsufsort divsufsort64 pthread)
 # https://stackoverflow.com/questions/35116327/when-g-static-link-pthread-cause-segmentation-fault-why
 # pretty dirty but that is how it goes.
 if(LINK_STATICALLY)
-  set(CMAKE_EXE_LINKER_FLAGS "-static")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive")
 endif()

@@ -11,6 +11,11 @@
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"
 
+#define t_sa_dens 32
+#define t_isa_dens 8192
+
+typedef sdsl::enc_vector<sdsl::coder::elias_delta, 16> t_wt;
+
 struct build_cmd_options {
     size_t kmer_length;
     CLI::Option* kmer_length_opt = nullptr;
@@ -157,7 +162,7 @@ int do_build_cmd(const build_cmd_options& opts) {
         genomics::seq_io::write_to_file(gs, genome_structure_file);
     }
 
-    sdsl::csa_wt<sdsl::wt_huff<>, 32, 8192> fm_index;
+    sdsl::csa_sada<t_wt, t_sa_dens, t_isa_dens> fm_index;
     if (!load_from_file(fm_index, fm_index_file)) {
         cout << "No index file \"" << fm_index_file
              << "\" located. Building now..." << endl;
@@ -166,7 +171,7 @@ int do_build_cmd(const build_cmd_options& opts) {
         store_to_file(fm_index, fm_index_file);
     }   
 
-    genomics::genome_index<sdsl::wt_huff<>, 32, 8192> gi(fm_index, gs);
+    genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi(fm_index, gs);
     cout << "Successfully loaded index." << endl;
 
     ofstream output(opts.database_file);
@@ -189,7 +194,7 @@ int do_build_cmd(const build_cmd_options& opts) {
 
     vector<thread> threads;
     for (int i = 0; i < opts.nthreads; i++) {
-        thread t(genomics::process_kmers_to_stream<sdsl::wt_huff<>, 32, 8192>,
+        thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
                  cref(gi), cref(pams), opts.mismatches,
 		 ref(kmer_p), ref(kmer_mtx),
 		 ref(output), ref(output_mtx));

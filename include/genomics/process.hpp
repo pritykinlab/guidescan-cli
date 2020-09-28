@@ -26,6 +26,12 @@ namespace genomics {
 	    }
 	    return count;
 	}
+
+        void off_target_counter(size_t sp, size_t ep, size_t k, size_t &count) {
+            count += ep - sp + 1;
+        }
+
+        std::function<void(size_t, size_t, size_t, size_t&)> counting_callback = off_target_counter;
     };
 
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
@@ -37,9 +43,15 @@ namespace genomics {
         coordinates coords = resolve_absolute(gi.gs, k.absolute_coords);
 
 	std::vector<std::set<std::tuple<size_t, size_t>>> off_targets_bwt(mismatches + 1);
+        size_t count = 0;
 	for (const auto& pam : pams) {
 	    std::string kmer_pos = k.sequence + pam;
 	    std::string kmer_neg = reverse_complement(kmer_pos);
+
+            gi.inexact_search(kmer_pos, pam.length(), false, 1, counting_callback, count);
+            if (count > 1) return;
+            gi.inexact_search(kmer_neg, pam.length(), true, 1, counting_callback, count);
+            if (count > 1) return;
 
 	    gi.inexact_search(kmer_pos, pam.length(), false, mismatches, callback, off_targets_bwt);
 	    if (count_off_targets(0, off_targets_bwt) > 1 || count_off_targets(1, off_targets_bwt) > 0) return;
@@ -58,8 +70,10 @@ namespace genomics {
 	    }
 	}
 	
+        std::string sam_line = genomics::get_sam_line(output, gi, k, coords, off_targets);
+
 	output_mtx.lock();
-	genomics::write_sam_line(output, gi, k, coords, off_targets);
+        output << sam_line << std::endl;
 	output_mtx.unlock();
     }
 

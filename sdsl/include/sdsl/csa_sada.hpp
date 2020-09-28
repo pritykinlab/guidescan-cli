@@ -285,7 +285,6 @@ class csa_sada
             return t_dens;
         }
 
-    private:
 
         // Calculates how many symbols c are in the prefix [0..i-1] of the BWT of the original text.
         /*
