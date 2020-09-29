@@ -47,7 +47,7 @@ namespace genomics {
                 ltrim(seq);
                 rtrim(seq);
 
-                for (auto i = 0; i < seq.length(); i++) {
+                for (size_t i = 0; i < seq.length(); i++) {
                     seq[i] = toupper(seq[i]);
                 }
             }
@@ -64,28 +64,28 @@ namespace genomics {
         genome_structure parse_genome_structure(std::istream& fasta_is) {
             genome_structure gs;
 
-            std::string line;
+            std::string chromosome_name, line;
             std::getline(fasta_is, line);
             if (line.size() < 1 || line[0] != '>') {
                 return gs;
             }
 
-            line = line.substr(1);
-            ltrim(line);
-            rtrim(line);
-	    auto words = split(line, ' ');
-	    line = words[0];
+            chromosome_name = line.substr(1);
+            ltrim(chromosome_name);
+            rtrim(chromosome_name);
+	    auto words = split(chromosome_name, ' ');
+	    chromosome_name = words[0];
             size_t length = 0;
         
-            for(std::string line; std::getline(fasta_is, line); ) {
+            while(std::getline(fasta_is, line)) {
                 if (line[0] == '>') {
-                    chromosome c = {line, length};
+                    chromosome c = {chromosome_name, length};
                     gs.push_back(c);
-                    line = line.substr(1);
-                    ltrim(line);
-                    rtrim(line);
-		    auto words = split(line, ' ');
-		    line = words[0];
+                    chromosome_name = line.substr(1);
+                    ltrim(chromosome_name);
+                    rtrim(chromosome_name);
+		    auto words = split(chromosome_name, ' ');
+		    chromosome_name = words[0];
                     length = 0;
                     continue;
                 }
@@ -93,7 +93,7 @@ namespace genomics {
                 length += line.length();
             }
 
-            chromosome c = {line, length};
+            chromosome c = {chromosome_name, length};
             gs.push_back(c);
 
             return gs;
