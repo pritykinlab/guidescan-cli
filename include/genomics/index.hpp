@@ -11,7 +11,7 @@ namespace genomics {
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     class genome_index {
     public:
-        typedef sdsl::csa_sada<t_wt, t_dens, t_inv_dens> t_csa;
+        typedef sdsl::csa_wt<t_wt, t_dens, t_inv_dens> t_csa;
 
         t_csa csa;
         genome_structure gs;

@@ -14,7 +14,7 @@
 #define t_sa_dens 32
 #define t_isa_dens 8192
 
-typedef sdsl::enc_vector<sdsl::coder::elias_delta, 16> t_wt;
+typedef sdsl::wt_huff<sdsl::bit_vector, sdsl::rank_support_v<>> t_wt;
 
 struct build_cmd_options {
     size_t kmer_length;
@@ -162,7 +162,7 @@ int do_build_cmd(const build_cmd_options& opts) {
         genomics::seq_io::write_to_file(gs, genome_structure_file);
     }
 
-    sdsl::csa_sada<t_wt, t_sa_dens, t_isa_dens> fm_index;
+    sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> fm_index;
     if (!load_from_file(fm_index, fm_index_file)) {
         cout << "No index file \"" << fm_index_file
              << "\" located. Building now..." << endl;
