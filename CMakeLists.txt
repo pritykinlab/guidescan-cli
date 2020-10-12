@@ -16,3 +16,4 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Wextra")
 
 add_subdirectory(sdsl)
 add_subdirectory(src bin)
+add_subdirectory(test test_bin)
