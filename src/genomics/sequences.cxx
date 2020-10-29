@@ -11,19 +11,21 @@ namespace genomics {
         return true;
     }
 
+    char complement(char c) {
+        switch (c) {
+        case 'A': return 'T';
+        case 'T': return 'A';
+        case 'C': return 'G';
+        case 'G': return 'C';
+        default: return c;
+        }
+    }
+
     std::string reverse_complement(const std::string& kmer) {
         std::string s;
         for (int i = kmer.length() - 1; i >= 0; i--) {
             char c = kmer[i];
-
-            switch (kmer[i]) {
-            case 'A': c = 'T'; break;
-            case 'T': c = 'A'; break;
-            case 'C': c = 'G'; break;
-            case 'G': c = 'C'; break;
-            }
-
-            s += c;
+            s += complement(c);
         }
 
         return s;

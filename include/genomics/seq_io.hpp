@@ -16,6 +16,9 @@ namespace genomics {
            genomic symbols and sends it to an output stream. */
         void parse_sequence(std::istream& fasta_is, std::ostream& sequence_os);
 
+        /* Takes the reverse complement of the input stream */
+        void reverse_complement_stream(std::istream& sequence_is, std::ostream& sequence_os);
+
         /* Parses a FASTA input stream to a genome_structure object that
            describes how absolute coordinates map to relative coordinates
            within the genome */

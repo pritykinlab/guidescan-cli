@@ -5,7 +5,7 @@
 #include <vector>
 #include <iterator>
 
-
+#include "genomics/sequences.hpp"
 #include "genomics/seq_io.hpp"
 
 namespace genomics {
@@ -58,6 +58,16 @@ namespace genomics {
                 if (line.length() > 0 && line[0] == '>') continue;
                 convert_raw_sequence(line);
                 sequence_os << line;
+            }
+        }
+
+        void reverse_complement_stream(std::istream& sequence_is, std::ostream& sequence_os) {
+            sequence_is.seekg(-1, std::ios_base::end);
+            int64_t offset = sequence_is.tellg();
+            for(char c; offset >= 0 && sequence_is; offset--) {
+                sequence_is.seekg(offset, std::ios_base::beg);
+                sequence_is >> c;
+                sequence_os << genomics::complement(c);
             }
         }
 

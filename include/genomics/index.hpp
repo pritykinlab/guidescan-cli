@@ -71,20 +71,20 @@ namespace genomics {
 
         /*
           PAM aware variant of inexact search where the PAM must match
-          exactly on either the right or left end. 
+          exactly on the right end. 
         */
         template <class t_data>
         void inexact_search(const std::string& query,
                             ssize_t position,
                             size_t sp, size_t ep,
-                            size_t pam_size, bool pam_left,
+                            const std::vector<std::string> &pams,
                             size_t mismatches, size_t k,
                             const std::function<void(size_t, size_t, size_t, t_data&)> &callback,
                             t_data& data) const;
 
         template <class t_data>
         void inexact_search(const std::string& query,
-                            size_t pam_size, bool pam_left,
+                            const std::vector<std::string> &pams,
                             size_t mismatches, 
                             const std::function<void(size_t, size_t, size_t, t_data&)> &callback,
                             t_data& data) const;
@@ -120,7 +120,7 @@ namespace genomics {
         if (k >= mismatches && c != 'N') return;
         if (c == 'N') cost = 0;
 
-        for (int i = 0; i < search_alphabet_size; i++) {
+        for (size_t i = 0; i < search_alphabet_size; i++) {
             if (search_alphabet[i] == c) continue;
 
             char a = search_alphabet[i];
@@ -153,13 +153,16 @@ namespace genomics {
     void genome_index<t_wt, t_dens, t_inv_dens>::inexact_search(const std::string& query,
                                                                 ssize_t position,
                                                                 size_t sp, size_t ep,
-                                                                size_t pam_size, bool pam_left,
+                                                                const std::vector<std::string> &pams,
                                                                 size_t mismatches, 
                                                                 size_t k, 
                                                                 const std::function<void(size_t, size_t, size_t, t_data&)> &callback,
                                                                 t_data& data) const {
         if (position < 0) {
-            callback(sp, ep, k, data);
+            for (const auto& pam : pams) {
+                inexact_search(pam.begin(), pam.end(), sp, ep, 0, 0, callback, data);
+            }
+
             return;
         }
 
@@ -171,18 +174,15 @@ namespace genomics {
         if (occ_within > 0) {
             size_t sp_prime = csa.C[csa.char2comp[c]] + occ_before;
             size_t ep_prime = sp_prime + occ_within - 1;
-            inexact_search(query, position - 1, sp_prime, ep_prime, pam_size, pam_left,
+            inexact_search(query, position - 1, sp_prime, ep_prime, pams,
                            mismatches, k, callback, data);
         }
 
-        bool in_pam = (!pam_left && position >= query.length() - pam_size)
-                   || (pam_left && position < pam_size);
-
         size_t cost = 1;
-        if (c != 'N' && (k >= mismatches || in_pam)) return;
+        if (c != 'N' && k >= mismatches) return;
         if (c == 'N') cost = 0;
 
-        for (int i = 0; i < search_alphabet_size; i++) {
+        for (size_t i = 0; i < search_alphabet_size; i++) {
             if (search_alphabet[i] == c) continue;
 
             char a = search_alphabet[i];
@@ -193,7 +193,7 @@ namespace genomics {
             if (occ_within > 0) {
                 size_t sp_prime = csa.C[csa.char2comp[a]] + occ_before;
                 size_t ep_prime = sp_prime + occ_within - 1;
-                inexact_search(query, position - 1, sp_prime, ep_prime, pam_size, pam_left,
+                inexact_search(query, position - 1, sp_prime, ep_prime, pams,
                                mismatches, k + cost, callback, data);
             }
         }
@@ -202,11 +202,11 @@ namespace genomics {
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     template <class t_data>
     void genome_index<t_wt, t_dens, t_inv_dens>::inexact_search(const std::string& query,
-                                                                size_t pam_size, bool pam_left,
+                                                                const std::vector<std::string> &pams,
                                                                 size_t mismatches, 
                                                                 const std::function<void(size_t, size_t, size_t, t_data&)> &callback,
                                                                 t_data& data) const {
-        inexact_search(query, query.length() - 1, 0, csa.size() - 1, pam_size, pam_left,
+        inexact_search(query, query.length() - 1, 0, csa.size() - 1, pams,
                        mismatches, 0, callback, data);
     }
 

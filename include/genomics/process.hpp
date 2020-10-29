@@ -35,42 +35,58 @@ namespace genomics {
     };
 
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-    void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
+    void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
+                                const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
 				const std::vector<std::string> &pams, size_t mismatches,
                                 const kmer& k,
                                 std::ostream& output,
 				std::mutex& output_mtx) {
-        coordinates coords = resolve_absolute(gi.gs, k.absolute_coords);
-
-	std::vector<std::set<std::tuple<size_t, size_t>>> off_targets_bwt(mismatches + 1);
+        coordinates coords = resolve_absolute(gi_forward.gs, k.absolute_coords);
         size_t count = 0;
-	for (const auto& pam : pams) {
-	    std::string kmer_pos = k.sequence + pam;
-	    std::string kmer_neg = reverse_complement(kmer_pos);
 
-            gi.inexact_search(kmer_pos, pam.length(), false, 1, counting_callback, count);
-            if (count > 1) return;
-            gi.inexact_search(kmer_neg, pam.length(), true, 1, counting_callback, count);
-            if (count > 1) return;
+        /* Because of the way inexact searching is implemented (from
+         * back-to-front) I search for the reverse complement of the
+         * kmer on the reverse complement strand (which is essentially
+         * searching forward) and I search for the reverse complement
+         * of the kmer on the forward strand.
+         */
 
-	    gi.inexact_search(kmer_pos, pam.length(), false, mismatches, callback, off_targets_bwt);
-	    if (count_off_targets(0, off_targets_bwt) > 1 || count_off_targets(1, off_targets_bwt) > 0) return;
-	    gi.inexact_search(kmer_neg, pam.length(), true, mismatches, callback, off_targets_bwt);
-	    if (count_off_targets(0, off_targets_bwt) > 1 || count_off_targets(1, off_targets_bwt) > 0) return;
-	}
+        std::vector<std::string> pams_c;
+        for (const auto& pam : pams) {
+            pams_c.push_back(genomics::reverse_complement(pam));
+        }
+        
+        std::string kmer = genomics::reverse_complement(k.sequence);
+        gi_forward.inexact_search(kmer, pams_c, 1, counting_callback, count);
+        if (count > 1) return;
+        gi_reverse.inexact_search(kmer, pams_c, 1, counting_callback, count);
+        if (count > 1) return;
+
+	std::vector<std::set<std::tuple<size_t, size_t>>> forward_off_targets_bwt(mismatches + 1);
+	std::vector<std::set<std::tuple<size_t, size_t>>> reverse_off_targets_bwt(mismatches + 1);
+        gi_forward.inexact_search(kmer, pams_c, mismatches, callback, forward_off_targets_bwt);
+        gi_reverse.inexact_search(kmer, pams_c, mismatches, callback, reverse_off_targets_bwt);
 
 	std::vector<std::vector<size_t>> off_targets(mismatches);
 	for (int i = 0; i < mismatches; i++) {
-	    for (const auto& sp_ep : off_targets_bwt[i + 1]) {
+	    for (const auto& sp_ep : forward_off_targets_bwt[i + 1]) {
 		size_t sp = std::get<0>(sp_ep);
 		size_t ep = std::get<1>(sp_ep);
 		for (int j = sp; j <= ep; j++) {
-		    off_targets[i].push_back(gi.resolve(j));
+		    off_targets[i].push_back(gi_forward.resolve(j));
 		}
 	    }
+
+            for (const auto& sp_ep : reverse_off_targets_bwt[i + 1]) {
+                size_t sp = std::get<0>(sp_ep);
+		size_t ep = std::get<1>(sp_ep);
+		for (int j = sp; j <= ep; j++) {
+		    off_targets[i].push_back(gi_reverse.resolve(j));
+		}
+            }
 	}
-	
-        std::string sam_line = genomics::get_sam_line(output, gi, k, coords, off_targets);
+
+        std::string sam_line = genomics::get_sam_line(output, gi_forward, k, coords, off_targets);
 
 	output_mtx.lock();
         output << sam_line << std::endl;
@@ -80,7 +96,8 @@ namespace genomics {
     /* Processes the kmers in the file, collecting all information
        about off targets and outputting it to a stream in SAM format. */
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-    void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
+    void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
+                                 const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
 				 const std::vector<std::string> &pams, size_t mismatches,
 				 std::unique_ptr<genomics::kmer_producer>& kmer_p, std::mutex& kmer_mtx,
                                  std::ostream& output, std::mutex& output_mtx) {
@@ -91,7 +108,7 @@ namespace genomics {
 	    kmer_mtx.unlock();
 
 	    if (!kmers_left) break;
-	    process_kmer_to_stream(gi, pams, mismatches, out_kmer, output, output_mtx);
+	    process_kmer_to_stream(gi_forward, gi_reverse, pams, mismatches, out_kmer, output, output_mtx);
         }
     }
 }

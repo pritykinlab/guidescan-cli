@@ -11,7 +11,7 @@
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"
 
-#define t_sa_dens 32
+#define t_sa_dens 64
 #define t_isa_dens 8192
 
 typedef sdsl::wt_huff<sdsl::bit_vector, sdsl::rank_support_v<>> t_wt;
@@ -126,9 +126,11 @@ bool file_exists(const std::string& fileName)
 int do_build_cmd(const build_cmd_options& opts) {
     using namespace std;
 
-    string raw_sequence_file = opts.fasta_file + ".dna";
     string genome_structure_file = opts.fasta_file + ".gs";
-    string fm_index_file = opts.fasta_file + ".csa";
+    string forward_raw_sequence_file = opts.fasta_file + ".forward.dna";
+    string reverse_raw_sequence_file = opts.fasta_file + ".reverse.dna";
+    string forward_fm_index_file = opts.fasta_file + ".forward.csa";
+    string reverse_fm_index_file = opts.fasta_file + ".reverse.csa";
     
     ifstream fasta_is(opts.fasta_file);
     if (!fasta_is) {
@@ -138,16 +140,29 @@ int do_build_cmd(const build_cmd_options& opts) {
     }
 
     cout << "Reading sequence file..." << endl;
-    if (!file_exists(raw_sequence_file)) {
-        ofstream os(raw_sequence_file);
+    if (!file_exists(forward_raw_sequence_file)) {
+        ofstream os(forward_raw_sequence_file);
         if (!os) {
-            cerr << "ERROR: Could not create raw sequence file." << endl;
+            cerr << "ERROR: Could not create forward raw sequence file." << endl;
             return 1;
         }
 
-        cout << "No raw sequence file \"" << raw_sequence_file
+        cout << "No raw sequence file \"" << forward_raw_sequence_file
              << "\". Building now..." << endl;
         genomics::seq_io::parse_sequence(fasta_is, os);
+    }
+
+    if (!file_exists(reverse_raw_sequence_file)) {
+        ofstream os(reverse_raw_sequence_file);
+        if (!os) {
+            cerr << "ERROR: Could not create reverse raw sequence file." << endl;
+            return 1;
+        }
+
+        cout << "No raw sequence file \"" << reverse_raw_sequence_file
+             << "\". Building now..." << endl;
+        ifstream is(forward_raw_sequence_file);
+        genomics::seq_io::reverse_complement_stream(is, os);
     }
 
     cout << "Loading genome index..." << endl;
@@ -162,27 +177,37 @@ int do_build_cmd(const build_cmd_options& opts) {
         genomics::seq_io::write_to_file(gs, genome_structure_file);
     }
 
-    sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> fm_index;
-    if (!load_from_file(fm_index, fm_index_file)) {
-        cout << "No index file \"" << fm_index_file
+    sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> forward_fm_index;
+    if (!load_from_file(forward_fm_index, forward_fm_index_file)) {
+        cout << "No forward index file \"" << forward_fm_index_file
              << "\" located. Building now..." << endl;
 
-        construct(fm_index, raw_sequence_file, 1);
-        store_to_file(fm_index, fm_index_file);
+        construct(forward_fm_index, forward_raw_sequence_file, 1);
+        store_to_file(forward_fm_index, forward_fm_index_file);
     }   
 
-    genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi(fm_index, gs);
+    sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> reverse_fm_index;
+    if (!load_from_file(reverse_fm_index, reverse_fm_index_file)) {
+        cout << "No reverse index file \"" << reverse_fm_index_file
+             << "\" located. Building now..." << endl;
+
+        construct(reverse_fm_index, reverse_raw_sequence_file, 1);
+        store_to_file(reverse_fm_index, reverse_fm_index_file);
+    }   
+
+    genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_forward(forward_fm_index, gs);
+    genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_reverse(reverse_fm_index, gs);
     cout << "Successfully loaded index." << endl;
 
     ofstream output(opts.database_file);
-    genomics::write_sam_header(output, gi.gs);
+    genomics::write_sam_header(output, gi_forward.gs);
 
     std::unique_ptr<genomics::kmer_producer> kmer_p;
 
     if (opts.kmers_file_opt->count() > 0) {
 	kmer_p = make_unique<genomics::kmers_file_producer>(opts.kmers_file);
     } else {
-	kmer_p = make_unique<genomics::seq_kmer_producer>(raw_sequence_file, gs, opts.kmer_length,
+	kmer_p = make_unique<genomics::seq_kmer_producer>(forward_raw_sequence_file, gs, opts.kmer_length,
                                                           opts.pam, opts.chr_length);
     }
 
@@ -195,7 +220,8 @@ int do_build_cmd(const build_cmd_options& opts) {
     vector<thread> threads;
     for (int i = 0; i < opts.nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
-                 cref(gi), cref(pams), opts.mismatches,
+                 cref(gi_forward), cref(gi_reverse),
+                 cref(pams), opts.mismatches,
 		 ref(kmer_p), ref(kmer_mtx),
 		 ref(output), ref(output_mtx));
         threads.push_back(move(t));
