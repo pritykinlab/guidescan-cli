@@ -62,13 +62,12 @@ namespace genomics {
         }
 
         void reverse_complement_stream(std::istream& sequence_is, std::ostream& sequence_os) {
-            sequence_is.seekg(-1, std::ios_base::end);
-            int64_t offset = sequence_is.tellg();
-            for(char c; offset >= 0 && sequence_is; offset--) {
-                sequence_is.seekg(offset, std::ios_base::beg);
-                sequence_is >> c;
-                sequence_os << genomics::complement(c);
+            std::string sequence;
+            while (sequence_is) {
+                sequence_is >> sequence;
             }
+
+            sequence_os << genomics::reverse_complement(sequence);
         }
 
         genome_structure parse_genome_structure(std::istream& fasta_is) {
