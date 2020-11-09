@@ -67,6 +67,11 @@ namespace genomics {
         gi_forward.inexact_search(kmer, pams_c, mismatches, callback, forward_off_targets_bwt);
         gi_reverse.inexact_search(kmer, pams_c, mismatches, callback, reverse_off_targets_bwt);
 
+        size_t genome_length = 0;
+        for (int i = 0; i < gi_forward.gs.size(); i++) {
+            genome_length += gi_forward.gs[i].length;
+        }
+        
 	std::vector<std::vector<size_t>> off_targets(mismatches);
 	for (int i = 0; i < mismatches; i++) {
 	    for (const auto& sp_ep : forward_off_targets_bwt[i + 1]) {
@@ -81,7 +86,7 @@ namespace genomics {
                 size_t sp = std::get<0>(sp_ep);
 		size_t ep = std::get<1>(sp_ep);
 		for (int j = sp; j <= ep; j++) {
-		    off_targets[i].push_back(gi_reverse.resolve(j));
+		    off_targets[i].push_back(genome_length - (gi_reverse.resolve(j) + 1));
 		}
             }
 	}

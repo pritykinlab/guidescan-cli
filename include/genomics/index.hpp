@@ -159,8 +159,13 @@ namespace genomics {
                                                                 const std::function<void(size_t, size_t, size_t, t_data&)> &callback,
                                                                 t_data& data) const {
         if (position < 0) {
+            std::function<void(size_t, size_t, size_t, t_data&)> matching_callback =
+                [k, callback](size_t sp, size_t ep, size_t mismatches, t_data& data) {
+                    return callback(sp, ep, k, data);
+                } ;
+
             for (const auto& pam : pams) {
-                inexact_search(pam.begin(), pam.end(), sp, ep, 0, 0, callback, data);
+                inexact_search(pam.begin(), pam.end(), sp, ep, 0, 0, matching_callback, data);
             }
 
             return;
