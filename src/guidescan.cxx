@@ -4,6 +4,8 @@
 
 #include <sdsl/suffix_arrays.hpp>
 
+#include "json.hpp"
+#include "httplib.h"
 #include "CLI/CLI.hpp"
 #include "genomics/index.hpp"
 #include "genomics/sam.hpp"
@@ -14,7 +16,7 @@
 #define t_sa_dens 64
 #define t_isa_dens 8192
 
-typedef sdsl::wt_huff<sdsl::bit_vector, sdsl::rank_support_v<>> t_wt;
+typedef sdsl::wt_huff<> t_wt;
 
 struct build_cmd_options {
     size_t kmer_length;
@@ -60,6 +62,14 @@ struct kmer_cmd_options {
 
     std::string pam;
     CLI::Option* pam_opt;
+};
+
+struct http_server_cmd_options {
+    std::string fasta_file;
+    CLI::Option* fasta_file_opt = nullptr;
+
+    size_t port;
+    CLI::Option* port_opt = nullptr;
 };
 
 CLI::App* build_cmd(CLI::App &guidescan, build_cmd_options& opts) {
@@ -109,6 +119,18 @@ CLI::App* kmer_cmd(CLI::App &guidescan, kmer_cmd_options& opts) {
 	->required();
 
     return kmers;
+}
+
+CLI::App* http_cmd(CLI::App &guidescan, http_server_cmd_options& opts) {
+    auto http = guidescan.add_subcommand("http-server",
+                                         "Starts a local HTTP server to receive gRNA processing requests.");
+    opts.port = 4500;
+    opts.port_opt       = http->add_option("--port", opts.port, "HTTP Server Port", true);
+    opts.fasta_file_opt = http->add_option("genome", opts.fasta_file, "Genome in FASTA format")
+	->check(CLI::ExistingFile)
+	->required();
+
+    return http;
 }
 
 template<typename T, typename... Args>
@@ -237,7 +259,7 @@ int do_build_cmd(const build_cmd_options& opts) {
 int do_kmers_cmd(const kmer_cmd_options& opts) {
     using namespace std;
 
-    string raw_sequence_file = opts.fasta_file + ".dna";
+    string raw_sequence_file = opts.fasta_file + ".forward.dna";
     string genome_structure_file = opts.fasta_file + ".gs";
 
     ifstream fasta_is(opts.fasta_file);
@@ -281,6 +303,103 @@ int do_kmers_cmd(const kmer_cmd_options& opts) {
 
     return 0;
 }
+
+int do_http_server_cmd(const http_server_cmd_options& opts) {
+    using namespace std;
+    using json = nlohmann::json;
+
+    string genome_structure_file = opts.fasta_file + ".gs";
+    string forward_raw_sequence_file = opts.fasta_file + ".forward.dna";
+    string reverse_raw_sequence_file = opts.fasta_file + ".reverse.dna";
+    string forward_fm_index_file = opts.fasta_file + ".forward.csa";
+    string reverse_fm_index_file = opts.fasta_file + ".reverse.csa";
+    
+    ifstream fasta_is(opts.fasta_file);
+    if (!fasta_is) {
+        cerr << "ERROR: FASTA file \"" << opts.fasta_file
+             << "\" does not exist." << endl;
+        return 1;
+    }
+
+    cout << "Reading sequence file..." << endl;
+    if (!file_exists(forward_raw_sequence_file)) {
+        ofstream os(forward_raw_sequence_file);
+        if (!os) {
+            cerr << "ERROR: Could not create forward raw sequence file." << endl;
+            return 1;
+        }
+
+        cout << "No raw sequence file \"" << forward_raw_sequence_file
+             << "\". Building now..." << endl;
+        genomics::seq_io::parse_sequence(fasta_is, os);
+    }
+
+    if (!file_exists(reverse_raw_sequence_file)) {
+        ofstream os(reverse_raw_sequence_file);
+        if (!os) {
+            cerr << "ERROR: Could not create reverse raw sequence file." << endl;
+            return 1;
+        }
+
+        cout << "No raw sequence file \"" << reverse_raw_sequence_file
+             << "\". Building now..." << endl;
+        ifstream is(forward_raw_sequence_file);
+        genomics::seq_io::reverse_complement_stream(is, os);
+    }
+
+    cout << "Loading genome index..." << endl;
+    genomics::genome_structure gs;
+    if (!genomics::seq_io::load_from_file(gs, genome_structure_file)) {
+        cout << "No genome structure file \"" << genome_structure_file
+             << "\" located. Building now..." << endl;
+
+        fasta_is.clear();
+        fasta_is.seekg(0);
+        gs = genomics::seq_io::parse_genome_structure(fasta_is);
+        genomics::seq_io::write_to_file(gs, genome_structure_file);
+    }
+
+    sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> forward_fm_index;
+    if (!load_from_file(forward_fm_index, forward_fm_index_file)) {
+        cout << "No forward index file \"" << forward_fm_index_file
+             << "\" located. Building now..." << endl;
+
+        construct(forward_fm_index, forward_raw_sequence_file, 1);
+        store_to_file(forward_fm_index, forward_fm_index_file);
+    }   
+
+    sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> reverse_fm_index;
+    if (!load_from_file(reverse_fm_index, reverse_fm_index_file)) {
+        cout << "No reverse index file \"" << reverse_fm_index_file
+             << "\" located. Building now..." << endl;
+
+        construct(reverse_fm_index, reverse_raw_sequence_file, 1);
+        store_to_file(reverse_fm_index, reverse_fm_index_file);
+    }   
+
+    genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_forward(forward_fm_index, gs);
+    genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_reverse(reverse_fm_index, gs);
+    cout << "Successfully loaded index." << endl;
+
+    httplib::Server svr;
+    svr.Get("/search", [&gi_forward, &gi_reverse](const httplib::Request& req, httplib::Response& res){
+        if (!req.has_param("sequence")) {
+            return;
+        }
+
+        auto sequence = req.get_param_value("sequence");
+        if (sequence.length() == 0) return;
+
+        json result = search_kmer(gi_forward, gi_reverse, sequence, 1);
+        res.set_content(result.dump(), "application/json");
+    });
+
+    svr.listen("localhost", opts.port);
+    cout << "Successfully started local server." << endl;
+        
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     CLI::App guidescan("Guidescan all-in-one interface.\n");
@@ -289,9 +408,11 @@ int main(int argc, char *argv[])
 
     build_cmd_options build_opts;
     kmer_cmd_options kmer_opts;
+    http_server_cmd_options http_opts;
 
     auto build = build_cmd(guidescan, build_opts);
     auto kmer  = kmer_cmd(guidescan, kmer_opts);
+    auto http  = http_cmd(guidescan, http_opts);
 
     try {
 	guidescan.parse(argc, argv);
@@ -305,6 +426,10 @@ int main(int argc, char *argv[])
 
     if (guidescan.got_subcommand("build")) {
 	return do_build_cmd(build_opts);
+    }
+
+    if (guidescan.got_subcommand("http-server")) {
+        return do_http_server_cmd(http_opts);
     }
 
     return 1;

@@ -4,6 +4,7 @@
 #include <set>
 #include <tuple>
 
+#include "json.hpp"
 #include "genomics/kmer.hpp"
 #include "genomics/sequences.hpp"
 #include "genomics/sam.hpp"
@@ -96,6 +97,61 @@ namespace genomics {
 	output_mtx.lock();
         output << sam_line << std::endl;
 	output_mtx.unlock();
+    }
+
+
+    template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
+    nlohmann::json search_kmer(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
+                                                      const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
+                                                      std::string kmer, size_t mismatches) {
+        using json = nlohmann::json;
+	std::vector<std::set<std::tuple<size_t, size_t>>> forward_matches(mismatches + 1);
+	std::vector<std::set<std::tuple<size_t, size_t>>> reverse_matches(mismatches + 1);
+
+        gi_forward.inexact_search(kmer.begin(), kmer.end(), mismatches, callback, forward_matches);
+        gi_reverse.inexact_search(kmer.begin(), kmer.end(), mismatches, callback, reverse_matches);
+
+        size_t genome_length = 0;
+        for (int i = 0; i < gi_forward.gs.size(); i++) {
+            genome_length += gi_forward.gs[i].length;
+        }
+
+        json matches;
+	for (int i = 0; i < mismatches + 1; i++) {
+	    for (const auto& sp_ep : forward_matches[i]) {
+		size_t sp = std::get<0>(sp_ep);
+		size_t ep = std::get<1>(sp_ep);
+		for (int j = sp; j <= ep; j++) {
+                    size_t absolute_pos = gi_forward.resolve(j);
+                    coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
+                    json match = {
+                        {"chr", pos.chr.name},
+                        {"pos", pos.offset},
+                        {"strand", "+"},
+                        {"distance", i}
+                    };
+                    matches.push_back(match);
+		}
+	    }
+
+            for (const auto& sp_ep : reverse_matches[i]) {
+                size_t sp = std::get<0>(sp_ep);
+		size_t ep = std::get<1>(sp_ep);
+		for (int j = sp; j <= ep; j++) {
+                    size_t absolute_pos = genome_length - (gi_reverse.resolve(j) + 1);
+                    coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
+                    json match = {
+                        {"chr", pos.chr.name},
+                        {"pos", pos.offset},
+                        {"strand", "-"},
+                        {"distance", i}
+                    };
+                    matches.push_back(match);
+		}
+            }
+	}
+
+        return matches;
     }
 
     /* Processes the kmers in the file, collecting all information
