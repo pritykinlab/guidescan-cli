@@ -390,12 +390,12 @@ int do_http_server_cmd(const http_server_cmd_options& opts) {
         auto sequence = req.get_param_value("sequence");
         if (sequence.length() == 0) return;
 
-        json result = search_kmer(gi_forward, gi_reverse, sequence, 1);
+        json result = search_kmer(gi_forward, gi_reverse, sequence, 2);
         res.set_content(result.dump(), "application/json");
     });
 
-    svr.listen("localhost", opts.port);
     cout << "Successfully started local server." << endl;
+    svr.listen("localhost", opts.port);
         
     return 0;
 }

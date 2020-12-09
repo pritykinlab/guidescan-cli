@@ -121,7 +121,7 @@ namespace genomics {
 	    for (const auto& sp_ep : forward_matches[i]) {
 		size_t sp = std::get<0>(sp_ep);
 		size_t ep = std::get<1>(sp_ep);
-		for (int j = sp; j <= ep; j++) {
+		for (size_t j = sp; j <= ep; j++) {
                     size_t absolute_pos = gi_forward.resolve(j);
                     coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
                     json match = {
@@ -137,7 +137,7 @@ namespace genomics {
             for (const auto& sp_ep : reverse_matches[i]) {
                 size_t sp = std::get<0>(sp_ep);
 		size_t ep = std::get<1>(sp_ep);
-		for (int j = sp; j <= ep; j++) {
+		for (size_t j = sp; j <= ep; j++) {
                     size_t absolute_pos = genome_length - (gi_reverse.resolve(j) + 1);
                     coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
                     json match = {
