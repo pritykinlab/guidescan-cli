@@ -159,6 +159,7 @@ namespace genomics {
                                                                 const std::function<void(size_t, size_t, size_t, t_data&)> &callback,
                                                                 t_data& data) const {
         if (position < 0) {
+
             std::function<void(size_t, size_t, size_t, t_data&)> matching_callback =
                 [k, callback](size_t sp, size_t ep, size_t mismatches, t_data& data) {
                     return callback(sp, ep, k, data);
@@ -185,7 +186,6 @@ namespace genomics {
 
         size_t cost = 1;
         if (c != 'N' && k >= mismatches) return;
-        if (c == 'N') cost = 0;
 
         for (size_t i = 0; i < search_alphabet_size; i++) {
             if (search_alphabet[i] == c) continue;
