@@ -73,7 +73,7 @@ namespace genomics {
             genome_length += gi_forward.gs[i].length;
         }
         
-	std::vector<std::vector<size_t>> off_targets(mismatches);
+	std::vector<std::vector<int64_t>> off_targets(mismatches);
 	for (int i = 0; i < mismatches; i++) {
 	    for (const auto& sp_ep : forward_off_targets_bwt[i + 1]) {
 		size_t sp = std::get<0>(sp_ep);
@@ -87,7 +87,7 @@ namespace genomics {
                 size_t sp = std::get<0>(sp_ep);
 		size_t ep = std::get<1>(sp_ep);
 		for (int j = sp; j <= ep; j++) {
-		    off_targets[i].push_back(genome_length - (gi_reverse.resolve(j) + 1));
+		    off_targets[i].push_back(-(genome_length - (gi_reverse.resolve(j) + 1)));
 		}
             }
 	}

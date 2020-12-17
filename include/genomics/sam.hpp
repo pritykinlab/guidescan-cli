@@ -90,7 +90,7 @@ namespace genomics {
 	}
 
 	std::string off_target_string(genome_structure gs,
-				      const std::vector<std::vector<size_t>>& off_targets) {
+				      const std::vector<std::vector<int64_t>>& off_targets) {
 	    uint64_t delim = get_delim(gs);
 	    std::vector<uint64_t> v;
 
@@ -114,7 +114,7 @@ namespace genomics {
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     std::string get_sam_line(std::ostream& os, genome_index<t_wt, t_dens, t_inv_dens> gi,
 			const kmer& k, const coordinates& coords,
-			const std::vector<std::vector<size_t>>& off_targets) {
+			const std::vector<std::vector<int64_t>>& off_targets) {
 	std::string sequence(k.sequence + k.pam);
 	std::string samline(sequence);
 
