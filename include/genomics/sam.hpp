@@ -96,7 +96,7 @@ namespace genomics {
 
 	    for (uint64_t k = 0; k < off_targets.size(); k++) {
 		v.insert(v.end(), off_targets[k].begin(), off_targets[k].end());
-		v.push_back(k);
+		v.push_back(k + 1);
 		v.push_back(delim);
 	    }
 
