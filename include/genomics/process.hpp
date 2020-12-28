@@ -58,7 +58,6 @@ namespace genomics {
         }
         
         std::string kmer = genomics::reverse_complement(k.sequence);
-        std::cout << kmer << std::endl;
         gi_forward.inexact_search(kmer, pams_c, 1, counting_callback, count);
         if (count > 1) return;
         gi_reverse.inexact_search(kmer, pams_c, 1, counting_callback, count);
@@ -87,7 +86,6 @@ namespace genomics {
 		size_t ep = std::get<1>(sp_ep);
 		for (size_t j = sp; j <= ep; j++) {
                     int64_t absolute_pos = -gi_forward.resolve(j);
-                    std::cout << absolute_pos << std::endl;
 		    off_targets[i].push_back(absolute_pos);
 		}
 	    }
@@ -97,7 +95,6 @@ namespace genomics {
 		size_t ep = std::get<1>(sp_ep);
 		for (size_t j = sp; j <= ep; j++) {
                     int64_t absolute_pos = genome_length - (gi_reverse.resolve(j) + 1);
-                    std::cout << absolute_pos << std::endl;
 		    off_targets[i].push_back(absolute_pos);
 		}
             }
@@ -134,7 +131,6 @@ namespace genomics {
 		size_t ep = std::get<1>(sp_ep);
 		for (size_t j = sp; j <= ep; j++) {
                     size_t absolute_pos = gi_forward.resolve(j);
-                    std::cout << absolute_pos << std::endl;
                     coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
                     json match = {
                         {"chr", pos.chr.name},
@@ -151,7 +147,6 @@ namespace genomics {
 		size_t ep = std::get<1>(sp_ep);
 		for (size_t j = sp; j <= ep; j++) {
                     size_t absolute_pos = genome_length - (gi_reverse.resolve(j) + 1);
-                    std::cout << absolute_pos << std::endl;
                     coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
                     json match = {
                         {"chr", pos.chr.name},
