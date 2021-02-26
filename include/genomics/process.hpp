@@ -39,6 +39,7 @@ namespace genomics {
     void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
                                 const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
 				const std::vector<std::string> &pams, size_t mismatches,
+                                size_t threshold,
                                 const kmer& k,
                                 std::ostream& output,
 				std::mutex& output_mtx) {
@@ -58,9 +59,9 @@ namespace genomics {
         }
         
         std::string kmer = genomics::reverse_complement(k.sequence);
-        gi_forward.inexact_search(kmer, pams_c, 1, counting_callback, count);
+        gi_forward.inexact_search(kmer, pams_c, threshold, counting_callback, count);
         if (count > 1) return;
-        gi_reverse.inexact_search(kmer, pams_c, 1, counting_callback, count);
+        gi_reverse.inexact_search(kmer, pams_c, threshold, counting_callback, count);
         if (count > 1) return;
 
 	std::vector<std::set<std::tuple<size_t, size_t>>> forward_off_targets_bwt(mismatches + 1);
@@ -110,8 +111,8 @@ namespace genomics {
 
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     nlohmann::json search_kmer(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
-                                                      const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
-                                                      std::string kmer, size_t mismatches) {
+                               const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
+                               std::string kmer, size_t mismatches) {
         using json = nlohmann::json;
 	std::vector<std::set<std::tuple<size_t, size_t>>> forward_matches(mismatches + 1);
 	std::vector<std::set<std::tuple<size_t, size_t>>> reverse_matches(mismatches + 1);
@@ -167,7 +168,8 @@ namespace genomics {
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
                                  const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
-				 const std::vector<std::string> &pams, size_t mismatches,
+				 const std::vector<std::string> &pams,
+                                 size_t mismatches, size_t threshold,
 				 std::unique_ptr<genomics::kmer_producer>& kmer_p, std::mutex& kmer_mtx,
                                  std::ostream& output, std::mutex& output_mtx) {
         kmer out_kmer;
@@ -177,7 +179,7 @@ namespace genomics {
 	    kmer_mtx.unlock();
 
 	    if (!kmers_left) break;
-	    process_kmer_to_stream(gi_forward, gi_reverse, pams, mismatches, out_kmer, output, output_mtx);
+	    process_kmer_to_stream(gi_forward, gi_reverse, pams, mismatches, threshold, out_kmer, output, output_mtx);
         }
     }
 }

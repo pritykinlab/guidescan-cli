@@ -22,6 +22,9 @@ struct build_cmd_options {
     size_t kmer_length;
     CLI::Option* kmer_length_opt = nullptr;
 
+    size_t threshold;
+    CLI::Option* threshold_opt = nullptr;
+
     size_t mismatches;
     CLI::Option* mismatches_opt = nullptr;
     
@@ -82,6 +85,7 @@ CLI::App* build_cmd(CLI::App &guidescan, build_cmd_options& opts) {
     opts.nthreads    = std::thread::hardware_concurrency();
     opts.pam         = std::string("NGG");
     opts.alt_pams    = {std::string("NAG")};
+    opts.threshold   = 1;
     opts.mismatches  = 3;
     opts.chr_length  = 1000;
 
@@ -91,6 +95,7 @@ CLI::App* build_cmd(CLI::App &guidescan, build_cmd_options& opts) {
     opts.pam_opt         = build->add_option("-p,--pam", opts.pam, "Main PAM to generate gRNAs and find off-targets", true);
     opts.alt_pams_opt    = build->add_option("-a,--alt-pam", opts.alt_pams, "Alternative PAMs used to find off-targets", true);
     opts.mismatches_opt  = build->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
+    opts.threshold_opt   = build->add_option("-t,--threshold", opts.threshold, "Filters gRNAs with off-targets at a distance at or below this threshold", true);
     opts.kmers_file_opt  = build->add_option("-f,--kmers-file", opts.kmers_file,
 					     "File containing kmers to build gRNA database"
 					     " over, if not specified, will generate the database over all kmers with the given PAM")
@@ -250,7 +255,7 @@ int do_build_cmd(const build_cmd_options& opts) {
     for (int i = 0; i < opts.nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
                  cref(gi_forward), cref(gi_reverse),
-                 cref(pams), opts.mismatches,
+                 cref(pams), opts.mismatches, opts.threshold,
 		 ref(kmer_p), ref(kmer_mtx),
 		 ref(output), ref(output_mtx));
         threads.push_back(move(t));
@@ -420,6 +425,8 @@ int main(int argc, char *argv[])
     auto build = build_cmd(guidescan, build_opts);
     auto kmer  = kmer_cmd(guidescan, kmer_opts);
     auto http  = http_cmd(guidescan, http_opts);
+
+    (void) build; (void) http; (void) kmer; // supress unused variable warnings
 
     try {
 	guidescan.parse(argc, argv);
