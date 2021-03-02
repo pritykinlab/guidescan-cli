@@ -185,7 +185,7 @@ namespace genomics {
         }
 
         size_t cost = 1;
-        if (c != 'N' && k >= mismatches) return;
+        if (k >= mismatches) return;
 
         for (size_t i = 0; i < search_alphabet_size; i++) {
             if (search_alphabet[i] == c) continue;
