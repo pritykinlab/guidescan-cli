@@ -135,17 +135,6 @@ def map_coord_to_30nt_context(fasta_record_dict, chr, start, end, antisense):
         pos_end = end + 4
         return revcom(fasta_record_dict[chr].seq[pos_start:pos_end].upper())
 
-def map_coord_to_30nt_context_pos(fasta_record_dict, chr, start, antisense, query_name):
-    offset = 23 - len(query_name)
-    if not antisense:
-        pos_start = start - (4 + offset)
-        pos_end = start + (26 - offset)
-        return fasta_record_dict[chr].seq[pos_start:pos_end].upper()
-    else:
-        pos_start = start - (25 - offset)
-        pos_end = start + (5 + offset)
-        return revcom(fasta_record_dict[chr].seq[pos_start:pos_end].upper())
-
 def offtarget_hex_to_cfd_score(fasta_record_dict, genome, delim, ots_hex, sgrna):
     cfd = 0 
     for distance, offtarget_pos in hex_to_offtargetinfo(ots_hex, delim=delim):
@@ -174,26 +163,11 @@ def argument_parser():
 
     parser.add_argument('database',
         type=str,
-        help='Guidescan database file (SAM/BAM format acceptable)')
+        help='guidescan database file (SAM/BAM format acceptable)')
 
     parser.add_argument('ref_seq',
         type=str,
-        help='Reference sequence used to construct Guidescan DB')
-
-    parser.add_argument('--parts',
-        default=1,
-        type=int,
-        help='Number of parts to split work into.')
-
-    parser.add_argument('--part-id',
-        type=int,
-        default=0,
-        help='ID of the part currently working on (0 - N).')
-
-    parser.add_argument('--num-guides',
-        type=int,
-        default=-1,
-        help='Number of guides in the database')   
+        help='reference sequence used to construct Guidescan DB')
 
     return parser
 
@@ -228,25 +202,8 @@ if __name__ == "__main__":
         rs2 = model_comparison.predict(seq, -1, -1, model=rule_set_2_model)
         return rs2
 
-    if args.parts > 1 and args.num_guides > 0:
-        partition_size = math.ceil(args.num_guides / args.parts)
-        start_rec = partition_size * args.part_id
-        end_rec   = partition_size * (args.part_id + 1)
-    else:
-        start_rec = 0
-        end_rec = np.inf
-
-    idx = -1
     outfile = pysam.AlignmentFile("-", "w", template=guidescan_db)
     for guide_record in guidescan_db:
-        idx += 1
-
-        if idx < start_rec:
-            continue
-
-        if idx == end_rec:
-            break
-
         cfd = compute_cfd(guide_record)
         rs2 = compute_rs2(guide_record)
         

@@ -22,16 +22,16 @@ import subprocess as sp
 import fcntl 
 import time
 import re
+import math
 
 from pathlib import Path
 
-def get_bsub_args(state, bsub_files, name, threads=1):
-    mem = STATE_PARAMS[state]['mem']
-    time = STATE_PARAMS[state]['time']
+def get_bsub_args(state, bsub_files, name, time='4:00', threads=1):
+    mem, mem_unit = STATE_PARAMS[state]['mem']
     return list(map(str, [
         '-W', time, 
-        '-R', f'rusage[mem={mem}]',
-        '-R', 'span[hosts=1]',
+        '-R', f'rusage[mem={math.ceil(mem / threads)}{mem_unit}]',
+        '-R', f'span[ptile={threads}]',
         '-n', threads,
         '-J', name,
         '-o', f'{bsub_files}/%J.stdout',
@@ -53,7 +53,7 @@ def unparse_to_list(args):
 def make_cmd(bsub_args, sp_args):
     args = ['bsub']
     args += bsub_args
-    args.append(f'python {sys.argv[0]} {" ".join(map(str, sp_args))}')
+    args.append(f'{sys.argv[0]} {" ".join(map(str, sp_args))}')
     return list(map(str, args))
 
 def log_state(state_file, message):
@@ -120,7 +120,7 @@ def watcher_state(args):
             args.state = 'gen-kmers'
             sp_args = unparse_to_list(args)
             bsub_args = get_bsub_args(args.state, args.bsub_files, 
-                                      f'gen-kmers-{args.job_id}' )
+                                      f'gen-kmers-{args.job_id}', time=args.time)
             start_bsub('watcher', args.state_file, bsub_args, sp_args)
             log_state(args.state_file, f'STARTED\tgen-kmers\n')
            
@@ -136,7 +136,7 @@ def watcher_state(args):
             args.state = 'build-dbs'
             sp_args = unparse_to_list(args)
             bsub_args = get_bsub_args(args.state, args.bsub_files,
-                                      f'build-dbs-{args.job_id}' )
+                                      f'build-dbs-{args.job_id}', time=args.time)
             start_bsub('watcher', args.state_file, bsub_args, sp_args)
             log_state(args.state_file, f'STARTED\tbuild-dbs\n')
 
@@ -144,7 +144,7 @@ def watcher_state(args):
             args.state = 'merge-dbs'
             sp_args = unparse_to_list(args)
             bsub_args = get_bsub_args(args.state, args.bsub_files,
-                                      f'merge-dbs-{args.job_id}' )
+                                      f'merge-dbs-{args.job_id}', 
             start_bsub('watcher', args.state_file, bsub_args, sp_args)
             log_state(args.state_file, f'STARTED\tmerge-dbs\n')
 
@@ -176,7 +176,7 @@ def generate_kmers_state(args):
         gs = sp.run(gs_args, check=True)
         with open(kmer_file_shuffled, 'w') as f:
             sp.run(['shuf', kmer_file], check=True, stdout=f) 
-        sp.run(['split', '-n', f'l/{NUM_PARTITIONS}', '-d', '-a', 
+        sp.run(['split', '-n', f'l/{args.num_jobs}', '-d', '-a', 
                 str(6),  '--additional-suffix', kmer_suffix,
                 kmer_file_shuffled, kmer_prefix], check=True)
     except sp.CalledProcessError as e:
@@ -227,15 +227,28 @@ def build_dbs_state(args):
     
         kmer_split_id = int(res.group('id'))
         kmer_job_name = f'build-split-db-{kmer_split_id}'
-        bsub_args = get_bsub_args('build-split-db', args.bsub_files, kmer_job_name)
-        sp_args = ['guidescan', 'build', '-n', '1', '-f', f'{kmer_dir}/{path}', 
-                   '-o', f'{db_dir}/{kmer_split_id}.sam', args.organism]
+
+        bsub_args = get_bsub_args(
+            'build-split-db',
+            args.bsub_files,
+            kmer_job_name,
+            time=args.time,
+            threads=args.num_cores
+        )
+
+        sp_args = [
+            'guidescan', 'build',
+            '-n', str(args.num_cores),
+            '-f', f'{kmer_dir}/{path}', 
+            '-o', f'{db_dir}/{kmer_split_id}.sam',
+            args.organism
+        ]
 
         try:
             cmd_args = ['bsub'] + bsub_args + [' '.join(sp_args)]
             sp.run(cmd_args, check=True)
         except sp.CalledProcessError as e:
-            log_state(state_file, f'FAILED\tbuild-dbs\n')
+            log_state(args.state_file, f'FAILED\tbuild-dbs\n')
             sys.exit(1)
 
         jobs.append(kmer_job_name)
@@ -247,6 +260,57 @@ def build_dbs_state(args):
     args.data = 'built-dbs' 
     sp_args = unparse_to_list(args)
     start_bsub('build-dbs', args.state_file, bsub_args, sp_args)
+
+def append_scores_state(args):
+    if args.data == 'appended-scores':
+        log_state(args.state_file, f'COMPLETED\tappend-scores\n')
+        return
+
+    db_dir = f'{args.results}/split_dbs/'
+    scored_db_dir = f'{args.results}/split_dbs_scored/'
+
+    Path(scored_db_dir).mkdir(parents=True, exist_ok=True)
+
+    jobs = []
+    for path in os.listdir(db_dir):
+        res = re.search('(?P<id>\\d+)\\.sam', path)
+        if res is None:
+            continue
+    
+        sam_split_id = int(res.group('id'))
+        sam_job_name = f'append-split-score-{sam_split_id}'
+
+        bsub_args = get_bsub_args(
+            'append-scores',
+            args.bsub_files,
+            sam_job_name,
+            time=args.time,
+            threads=1
+        )
+
+        sp_args = [
+            'append-scores', 
+            f'{db_dir}/{path}', 
+            args.organism,
+            '>', f'scored_db_dir/{sam_split_id}.sam'
+        ]
+
+        try:
+            cmd_args = ['bsub'] + bsub_args + [' '.join(sp_args)]
+            sp.run(cmd_args, check=True)
+        except sp.CalledProcessError as e:
+            log_state(args.state_file, f'FAILED\tappend-scores\n')
+            sys.exit(1)
+
+        jobs.append(sam_job_name)
+
+    bsub_args = get_bsub_args('append-scores', args.bsub_files, f'built-dbs-{args.job_id}')
+    bsub_args += ['-w', ' && '.join([f'done({job})' for job in jobs])]
+
+    args.state = 'append-scores'
+    args.data = 'appended-scores' 
+    sp_args = unparse_to_list(args)
+    start_bsub('append-scores', args.state_file, bsub_args, sp_args)
 
 def merge_dbs_state(args):
     guide_db = open(f'{args.results}/guide_db.sam', 'w')
@@ -279,16 +343,14 @@ STATE_MACHINE = {
 }
 
 STATE_PARAMS = {
-    'initial':        {'mem': '512MB', 'time': '1:00'},
-    'watcher':        {'mem': '512MB', 'time': '8:00'},
-    'gen-kmers':      {'mem': '2GB', 'time': '8:00'},
-    'gen-idx':        {'mem': '12GB', 'time': '8:00'},
-    'build-dbs':      {'mem': '512MB', 'time': '8:00'},
-    'build-split-db': {'mem': '12GB', 'time': '8:00'},
-    'merge-dbs':      {'mem': '4GB', 'time': '8:00'},
+    'initial':        {'mem': (512, 'MB')},
+    'watcher':        {'mem': (512, 'MB')},
+    'gen-kmers':      {'mem': (2, 'GB')},
+    'build-dbs':      {'mem': (512, 'MB')},
+    'merge-dbs':      {'mem': (4, 'GB')},
+    'gen-idx':        {'mem': (4, 'GB')},
+    'build-split-db': {'mem': (16384, 'MB')},
 }
-
-NUM_PARTITIONS=2000
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Build a Guidescan database from scratch')
@@ -297,16 +359,60 @@ def parse_arguments():
                                  'split-kmers', 'build-dbs', 'merge-dbs',
                                  'initial', 'watcher'],
                         default='initial')
-    parser.add_argument('organism', help='location of FASTA file for organism')
-    parser.add_argument('--state_file', help='stores the current state of the system',
-                        default=None)
-    parser.add_argument('--job_id', help='the identity of the system',
-                        default=None)
-    parser.add_argument('--bsub_files', help='location of LSF bsub file directory',
-                        default='bsub_files')
-    parser.add_argument('--results', help='location of result file directory',
-                        default='results')
-    parser.add_argument('--data', help='Arbitrary data to be passed between states.')
+    parser.add_argument(
+        'organism',
+        help='location of FASTA file for organism'
+    )
+
+    parser.add_argument(
+        '--state_file',
+        help='stores the current state of the system',
+        default=None
+    )
+
+    parser.add_argument(
+        '--job_id',
+        help='the identity of the system',
+        default=None
+    )
+
+    parser.add_argument(
+        '--bsub_files',
+        help='location of LSF bsub file directory',
+        default='bsub_files'
+    )
+
+    parser.add_argument(
+        '--results',
+        help='location of result file directory',
+        default='results'
+    )
+
+    parser.add_argument(
+        '--data',
+        help='arbitrary data to be passed between states.'
+    )
+
+    parser.add_argument(
+        '--num_jobs',
+        help='number of jobs to split DB construction into',
+        type=int,
+        default=1750
+    )
+
+    parser.add_argument(
+        '--num_cores',
+        help='number of cores per job',
+        type=int,
+        default=4,
+    )
+
+    parse.add_argument(
+        '--time',
+        help='total job time',
+        default='72:00'
+    )
+    
     return parser.parse_args()
 
 if __name__ == '__main__':
