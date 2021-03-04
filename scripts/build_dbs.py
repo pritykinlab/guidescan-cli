@@ -144,12 +144,17 @@ def watcher_state(args):
             args.state = 'merge-dbs'
             sp_args = unparse_to_list(args)
             bsub_args = get_bsub_args(args.state, args.bsub_files,
-                                      f'merge-dbs-{args.job_id}', 
+                                      f'merge-dbs-{args.job_id}', time=args.time)
             start_bsub('watcher', args.state_file, bsub_args, sp_args)
             log_state(args.state_file, f'STARTED\tmerge-dbs\n')
 
-        if 'merge-dbs' in completed:
-            break
+        if 'merge-dbs' in completed and 'append-scores' not in started:
+            args.state = 'append-scores'
+            sp_args = unparse_to_list(args)
+            bsub_args = get_bsub_args(args.state, args.bsub_files,
+                                      f'append-scores-{args.job_id}', time=args.time)
+            start_bsub('watcher', args.state_file, bsub_args, sp_args)
+            log_state(args.state_file, f'STARTED\tappend-scores\n')
 
         time.sleep(0.25)
 
@@ -157,6 +162,9 @@ def watcher_state(args):
     sys.exit(0)
 
 def generate_kmers_state(args):
+    log_state(args.state_file, f'COMPLETED\tgen-kmers\n')
+    return
+
     kmer_dir = f'{args.results}/kmers'
     kmer_file = f'{kmer_dir}/all_kmers.txt'
     kmer_file_shuffled = f'{kmer_dir}/all_kmers_shuffled.txt'
@@ -210,7 +218,7 @@ def generate_index_state(args):
     log_state(args.state_file, f'COMPLETED\tgen-idx\n')
 
 def build_dbs_state(args):
-    if args.data == 'built-dbs':
+    if True: # args.data == 'built-dbs':
         log_state(args.state_file, f'COMPLETED\tbuild-dbs\n')
         return
 
@@ -289,10 +297,10 @@ def append_scores_state(args):
         )
 
         sp_args = [
-            'append-scores', 
+            'append_scores', 
             f'{db_dir}/{path}', 
             args.organism,
-            '>', f'scored_db_dir/{sam_split_id}.sam'
+            '>', f'{scored_db_dir}/{sam_split_id}.sam'
         ]
 
         try:
@@ -340,6 +348,7 @@ STATE_MACHINE = {
     'gen-idx': generate_index_state,
     'build-dbs': build_dbs_state,
     'merge-dbs': merge_dbs_state,
+    'append-scores': append_scores_state
 }
 
 STATE_PARAMS = {
@@ -350,14 +359,13 @@ STATE_PARAMS = {
     'merge-dbs':      {'mem': (4, 'GB')},
     'gen-idx':        {'mem': (4, 'GB')},
     'build-split-db': {'mem': (16384, 'MB')},
+    'append-scores':  {'mem': (16384, 'MB')},
 }
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Build a Guidescan database from scratch')
     parser.add_argument('--state', help='state of database construction',
-                        choices=['gen-idx', 'gen-kmers', 'shuf-kmers',
-                                 'split-kmers', 'build-dbs', 'merge-dbs',
-                                 'initial', 'watcher'],
+                        choices=list(STATE_MACHINE.keys()),
                         default='initial')
     parser.add_argument(
         'organism',
@@ -407,7 +415,7 @@ def parse_arguments():
         default=4,
     )
 
-    parse.add_argument(
+    parser.add_argument(
         '--time',
         help='total job time',
         default='72:00'
