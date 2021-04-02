@@ -31,6 +31,9 @@ struct build_cmd_options {
     size_t nthreads;
     CLI::Option* nthreads_opt = nullptr;
 
+    bool enumerate_all;
+    CLI::Option* enumerate_all_opt = nullptr;
+
     size_t chr_length;
     CLI::Option* chr_length_opt = nullptr;
 
