@@ -22,7 +22,7 @@ struct build_cmd_options {
     size_t kmer_length;
     CLI::Option* kmer_length_opt = nullptr;
 
-    size_t threshold;
+    int threshold;
     CLI::Option* threshold_opt = nullptr;
 
     size_t mismatches;
