@@ -9,10 +9,10 @@ enumeration.
 
 There is a [Singularity](https://sylabs.io/docs/) container that
 bundles all dependencies for the application together. This is the
-easiest and most portable method to set up. It is **highly recommended**
-way to build the application this way. Additionally, the auxillary
-scripts (not necessary for most purposes) are only supported from
-within the the container environment.
+most straightforward method to building the program. It is
+**recommended** way to build the application this way. Additionally,
+the auxillary scripts (not necessary for most purposes) are only
+supported from within the the container environment.
 
 You can either build the container image from scratch or download it
 here. To build the container from scratch, simply run, 
@@ -91,11 +91,11 @@ the majority of use-cases, the first two commands are the most useful.
 
 The subcommand `build` constructs a gRNA database over a given genome,
 input in FASTA file format. By default, it lets all kmers matching the
-input PAM be potential guideRNAs, and prunes those that have bad
+input PAM be potential guideRNAs, and prunes those that have many
 off-targets. However, you can explicitly specify the kmers to check
 with the option `--kmers-file`. Because of the time taken to build a
 genome-wide database, it is **almost always** desirable to first
-generate the kmers prior to building the database. 
+generate the kmers prior to building the database.
 
 The usage for the subcommand is as follows:
 
@@ -115,7 +115,7 @@ Options:
   -p,--pam TEXT=NGG           Main PAM to generate gRNAs and find off-targets
   -a,--alt-pam TEXT=[NAG] ... Alternative PAMs used to find off-targets
   -m,--mismatches UINT=3      Number of mismatches to allow when finding off-targets
-  -t,--threshold UINT=1       Filters gRNAs with off-targets at a distance at or below this threshold
+  -t,--threshold INT=1       Filters gRNAs with off-targets at a distance at or below this threshold
   -f,--kmers-file TEXT:FILE   File containing kmers to build gRNA database over, if not specified, will generate the database over all kmers with the given PAM
   -o,--output TEXT REQUIRED   Output database file.
 ```
@@ -125,6 +125,22 @@ which again, can (and should) be executed as,
 ```shell
 $ singularity exec guidescan.sif guidescan --help
 ```
+
+### Performance Considerations
+
+Among these parameters, the `--mismatches` and `--threshold` parameter
+both have a great impact on performance. The running time increases
+exponentially with the mismatch parameter since the tool must
+explicitly search for all possible combinations of mismatches. Because
+of the density of the sgRNA space, we recommended that this parameter
+is set to be less than 4 and for most applications, less than 3.
+
+The threshold parameter `t` throws aways guides with any mismatches at
+less than or equal to this distance. Further, it short circuits when
+it finds a mismatch below this distance, greatly improving performance
+by avoiding needless computation. By default this is set to 1, but to
+insist that all off-targets are enumerated for all input kmers, set
+this value to -1.
 
 ## Kmers
 
@@ -175,6 +191,72 @@ Options:
   -k,--kmer-length UINT=20    Length of kmers excluding the PAM
   -p,--pam TEXT=NGG           PAM to generate kmers for
   -o,--output TEXT REQUIRED   Output kmers file.
+```
+
+## HTTP-Server
+
+The subcommand `http-server` is suprisingly useful. It services a
+sequence query in an on-line fashion, for tight integration with other
+tools. Specifically, `http-server` creates a genome-wide index over a
+genome and spawns an HTTP GET endpoint at `/search` which accepts the
+parameter `sequence`. This GET endpoint then searches the genome for
+all mismatches in a specified radius of the given sequence, and
+reports all such occurences as a JSON object.
+
+The usage for the subcommand is as follows:
+
+```shell
+$ guidescan http-server -h
+Starts a local HTTP server to receive gRNA processing requests.
+Usage: guidescan http-server [OPTIONS] genome
+
+Positionals:
+  genome TEXT:FILE REQUIRED   Genome in FASTA format
+
+Options:
+  -h,--help                   Print this help message and exit
+  --port UINT=4500            HTTP Server Port
+  -m,--mismatches UINT=3      Number of mismatches to allow when finding off-targets
+```
+
+### Example Use Case
+
+As an example use case, we use it to generate a set of 5000
+non-targeting sgRNAs (for use as controls) that have *no matches* up
+to distance 3 anywhere in the genome.
+
+First simply spin up a server against the genome of interest by
+running,
+
+```bash
+guidescan http-server -m 3 --port 4500 genome.fna
+```
+
+And then, execute the following python snippet.
+
+```python
+import requests
+import random
+
+# Returns true if the sequence has no matches in the genome.
+def check_grna(server_port, sequence):
+    res = requests.get(f"http://localhost:4500/search?sequence={sequence}NGG", timeout=30)
+    matches = res.json()
+    return matches is None
+    
+# Creates a random 20-length DNA sequence
+def random_dna_sequence():
+    return ''.join(random.choices(list('ATCG'), k=20))
+
+# Prints 5000 non-targeting control sgRNAs
+if __name__ == "__main__":
+    i = 0
+    while i < 5000
+        seq = random_dna_sequence()
+
+        if check_grna(port, seq):
+            print(seq)
+            i += 1
 ```
 
 # Auxillary Scripts
