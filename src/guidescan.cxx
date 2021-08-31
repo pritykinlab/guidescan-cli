@@ -77,6 +77,9 @@ struct http_server_cmd_options {
     size_t mismatches;
     CLI::Option* mismatches_opt = nullptr;
 
+    int ot_limit;
+    CLI::Option* ot_limit_opt = nullptr;
+
     size_t port;
     CLI::Option* port_opt = nullptr;
 };
@@ -137,10 +140,12 @@ CLI::App* http_cmd(CLI::App &guidescan, http_server_cmd_options& opts) {
                                          "Starts a local HTTP server to receive gRNA processing requests.");
     opts.mismatches  = 3;
     opts.port = 4500;
+    opts.ot_limit = -1;
 
 
     opts.port_opt       = http->add_option("--port", opts.port, "HTTP Server Port", true);
     opts.mismatches_opt = http->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
+    opts.ot_limit_opt   = http->add_option("-l,--offtarget-limit", opts.ot_limit, "Max number of off-targets to enumerate", true);
     opts.fasta_file_opt = http->add_option("genome", opts.fasta_file, "Genome in FASTA format")
 	->check(CLI::ExistingFile)
 	->required();
@@ -405,7 +410,7 @@ int do_http_server_cmd(const http_server_cmd_options& opts) {
         auto sequence = req.get_param_value("sequence");
         if (sequence.length() == 0) return;
 
-        json result = search_kmer(gi_forward, gi_reverse, sequence, opts.mismatches);
+        json result = search_kmer(gi_forward, gi_reverse, sequence, opts.mismatches, opts.ot_limit);
         res.set_content(result.dump(), "application/json");
     });
 
