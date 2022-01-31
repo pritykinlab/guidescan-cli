@@ -19,6 +19,8 @@ namespace genomics {
         std::function<void(size_t, size_t, size_t, std::vector<std::set<std::tuple<size_t, size_t>>>&)> callback = off_target_enumerator;
 
         size_t count_off_targets(size_t k, const std::vector<std::set<std::tuple<size_t, size_t>>> &off_targets_bwt) {
+            (void) count_off_targets; // to remove unused error
+
             size_t count = 0;
             for (const auto& sp_ep : off_targets_bwt[k]) {
                 size_t sp = std::get<0>(sp_ep);
@@ -29,6 +31,7 @@ namespace genomics {
         }
 
         void off_target_counter(size_t sp, size_t ep, size_t k, size_t &count) {
+            (void) k;
             count += ep - sp + 1;
         }
 
@@ -38,12 +41,11 @@ namespace genomics {
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
                                 const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
-                                const std::vector<std::string> &pams, size_t mismatches,
+                                std::vector<std::string> pams, size_t mismatches,
                                 int threshold,
                                 const kmer& k,
                                 std::ostream& output,
                                 std::mutex& output_mtx) {
-        coordinates coords = resolve_absolute(gi_forward.gs, k.absolute_coords);
         size_t count = 0;
 
         /* Because of the way inexact searching is implemented (from
@@ -52,6 +54,12 @@ namespace genomics {
          * searching forward) and I search for the reverse complement
          * of the kmer on the forward strand.
          */
+        
+        if (k.pam == "") {
+            pams = {std::string("")};
+        } else {
+            pams.push_back(k.pam);
+        }
 
         std::vector<std::string> pams_c;
         for (const auto& pam : pams) {
@@ -72,7 +80,7 @@ namespace genomics {
         gi_reverse.inexact_search(kmer, pams_c, mismatches, callback, reverse_off_targets_bwt);
 
         size_t genome_length = 0;
-        for (int i = 0; i < gi_forward.gs.size(); i++) {
+        for (size_t i = 0; i < gi_forward.gs.size(); i++) {
             genome_length += gi_forward.gs[i].length;
         }
         
@@ -83,7 +91,7 @@ namespace genomics {
          */
 
         std::vector<std::vector<int64_t>> off_targets(mismatches + 1);
-        for (int i = 0; i < mismatches + 1; i++) {
+        for (size_t i = 0; i < mismatches + 1; i++) {
             for (const auto& sp_ep : forward_off_targets_bwt[i]) {
                 size_t sp = std::get<0>(sp_ep);
                 size_t ep = std::get<1>(sp_ep);
@@ -103,7 +111,7 @@ namespace genomics {
             }
         }
 
-        std::string sam_line = genomics::get_sam_line(output, gi_forward, k, coords, off_targets);
+        std::string sam_line = genomics::get_sam_line(gi_forward, k, off_targets);
 
         output_mtx.lock();
         output << sam_line << std::endl;
@@ -123,13 +131,13 @@ namespace genomics {
         gi_reverse.inexact_search(kmer.begin(), kmer.end(), mismatches, callback, reverse_matches);
 
         size_t genome_length = 0;
-        for (int i = 0; i < gi_forward.gs.size(); i++) {
+        for (size_t i = 0; i < gi_forward.gs.size(); i++) {
             genome_length += gi_forward.gs[i].length;
         }
 
         json matches;
         int matches_enumerated = 0;
-        for (int i = 0; i < mismatches + 1; i++) {
+        for (size_t i = 0; i < mismatches + 1; i++) {
             for (const auto& sp_ep : forward_matches[i]) {
                 size_t sp = std::get<0>(sp_ep);
                 size_t ep = std::get<1>(sp_ep);
@@ -183,12 +191,12 @@ namespace genomics {
                                  const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
                                  const std::vector<std::string> &pams,
                                  size_t mismatches, int threshold,
-                                 std::unique_ptr<genomics::kmer_producer>& kmer_p, std::mutex& kmer_mtx,
+                                 genomics::kmer_producer& kmer_p, std::mutex& kmer_mtx,
                                  std::ostream& output, std::mutex& output_mtx) {
         kmer out_kmer;
         while (true) {
             kmer_mtx.lock();
-            bool kmers_left = kmer_p->get_next_kmer(out_kmer);
+            bool kmers_left = kmer_p.get_next_kmer(out_kmer);
             kmer_mtx.unlock();
 
             if (!kmers_left) break;

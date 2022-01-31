@@ -5,6 +5,7 @@
 #include <vector>
 #include <iterator>
 
+#include "csv.hpp"
 #include "genomics/sequences.hpp"
 #include "genomics/seq_io.hpp"
 
@@ -13,14 +14,14 @@ namespace genomics {
         namespace {
             inline void ltrim(std::string &s) {
                 s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {
-                                                                        return !std::isspace(ch);
-                                                                    }));
+                    return !std::isspace(ch);
+                }));
             }
 
             inline void rtrim(std::string &s) {
                 s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) {
-                                                               return !std::isspace(ch);
-                                                           }).base(), s.end());
+                    return !std::isspace(ch);
+                }).base(), s.end());
             }
 
             inline char my_toupper(char ch)
@@ -28,20 +29,20 @@ namespace genomics {
                 return static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
             }
 
-	    template <typename Out>
-	    void split(const std::string &s, char delim, Out result) {
-		std::istringstream iss(s);
-		std::string item;
-		while (std::getline(iss, item, delim)) {
-		    *result++ = item;
-		}
-	    }
+            template <typename Out>
+            void split(const std::string &s, char delim, Out result) {
+                std::istringstream iss(s);
+                std::string item;
+                while (std::getline(iss, item, delim)) {
+                    *result++ = item;
+                }
+            }
 
-	    std::vector<std::string> split(const std::string &s, char delim) {
-		std::vector<std::string> elems;
-		split(s, delim, std::back_inserter(elems));
-		return elems;
-	    }
+            std::vector<std::string> split(const std::string &s, char delim) {
+                std::vector<std::string> elems;
+                split(s, delim, std::back_inserter(elems));
+                return elems;
+            }
 
             void convert_raw_sequence(std::string& seq) {
                 ltrim(seq);
@@ -82,8 +83,8 @@ namespace genomics {
             chromosome_name = line.substr(1);
             ltrim(chromosome_name);
             rtrim(chromosome_name);
-	    auto words = split(chromosome_name, ' ');
-	    chromosome_name = words[0];
+            auto words = split(chromosome_name, ' ');
+            chromosome_name = words[0];
             size_t length = 0;
         
             while(std::getline(fasta_is, line)) {
@@ -93,8 +94,8 @@ namespace genomics {
                     chromosome_name = line.substr(1);
                     ltrim(chromosome_name);
                     rtrim(chromosome_name);
-		    auto words = split(chromosome_name, ' ');
-		    chromosome_name = words[0];
+                    auto words = split(chromosome_name, ' ');
+                    chromosome_name = words[0];
                     length = 0;
                     continue;
                 }
@@ -142,60 +143,15 @@ namespace genomics {
             return true;
         }
 
-	void write_to_file(const std::vector<kmer>& kmers, const std::string& filename) {
-            std::ofstream fs;
-            fs.open(filename);
-        
-            for (auto kmer : kmers) {
-                fs << kmer.sequence << " ";
-                fs << kmer.pam << " ";
-                fs << kmer.absolute_coords << " ";
-                fs << (kmer.dir == direction::positive ? "+" : "-") << std::endl;
-            }
-	}
-
-        void write_to_file(kmer_producer& kmer_p, const std::string& filename) {
-            std::ofstream fs;
-            fs.open(filename);
-        
-            kmer kmer;
-            while (kmer_p.get_next_kmer(kmer)) {
-                fs << kmer.sequence << " ";
-                fs << kmer.pam << " ";
-                fs << kmer.absolute_coords << " ";
-                fs << (kmer.dir == direction::positive ? "+" : "-") << std::endl;
-            }
-	}
-
-	size_t parse_kmer(std::istream& kmers_stream, kmer& out_kmer) {
-	    if (!kmers_stream) return 0;
-
-	    std::string line;
-	    std::getline(kmers_stream, line);
-	    auto words = split(line, ' ');
-
-	    if (words.size() < 4) return 0;
-
-	    std::istringstream iss(words[2]);
-	    size_t coords;
-	    iss >> coords;
-
-	    direction dir = (words[3] == "+") ? direction::positive : direction::negative;
-	    out_kmer = {words[0], words[1], coords, dir};
-	    return 1;
-	}
-
-	bool load_from_file(std::vector<kmer>& kmers, const std::string& filename) {
-	    std::ifstream fs(filename);
-
-            if (!fs) return false;
-        
-	    kmer k;
-            while (parse_kmer(fs, k)) {
-		kmers.push_back(k);
-	    }
-
-	    return true;
-	}
+        /* TODO: Make function work with CSV format and new kmer format */
+        bool parse_kmer(io::CSVReader<6> kmers_stream, kmer& out_kmer) {
+            // returns 0 on failure, 1 on success (interesting
+            // decision...)
+            std::string dir;
+            bool ret = kmers_stream.read_row(out_kmer.id, out_kmer.sequence, out_kmer.pam,
+                                             out_kmer.chromosome, out_kmer.position, dir);
+            out_kmer.dir = dir == "+" ? genomics::direction::positive : genomics::direction::negative;
+            return ret;
+        }
     }; 
 };

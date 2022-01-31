@@ -8,9 +8,11 @@ namespace genomics {
     enum class direction {positive, negative};
 
     struct kmer {
+        std::string id;
         std::string sequence;
         std::string pam;
-        size_t absolute_coords;
+        std::string chromosome;
+        size_t position;
         direction dir;
     };
 

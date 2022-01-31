@@ -162,6 +162,7 @@ namespace genomics {
 
             std::function<void(size_t, size_t, size_t, t_data&)> matching_callback =
                 [k, callback](size_t sp, size_t ep, size_t mismatches, t_data& data) {
+                    (void) mismatches;
                     return callback(sp, ep, k, data);
                 } ;
 
