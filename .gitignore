@@ -1,5 +1,8 @@
 Make.helper
 build/*
+typings/
+typings/*
+pyrightconfig.json
 build/
 bin/
 CMakeLists.txt.user
