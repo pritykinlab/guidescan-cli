@@ -1,0 +1,311 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{minted}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{color,soul}
+\usepackage{parskip}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{placeins}
+\usepackage{varwidth}
+\usepackage[labelfont=bf]{caption}
+\usepackage{booktabs} % To thicken table lines
+
+\usepackage{fancyhdr}
+\fancyhead{} % Clear the headers
+\renewcommand{\headrulewidth}{0pt} % Width of line at top of page
+\fancyhead[L]{\slshape\leftmark} % Mark right [R] of page with Chapter name [\leftmark]
+
+\pagestyle{fancy}
+
+\linespread{1.2}
+
+\geometry{margin=1in}
+
+\newcommand{\CC}{C\nolinebreak\hspace{-.05em}\raisebox{.4ex}{\tiny\bf
+    +}\nolinebreak\hspace{-.10em}\raisebox{.4ex}{\tiny\bf +}}
+\def\CC{{C\nolinebreak[4]\hspace{-.05em}\raisebox{.4ex}{\tiny\bf ++}}}
+
+\author{Henri Schmidt}
+\title{Guidescan2 Software Manual}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Installation}
+\subsection{Software Dependencies}
+The off-target enumeration tool, Guidescan2, relies on the
+installation of a modern \CC\ compiler and associated
+buildtools. Explicitly, the tool has the following dependencies.
+\begin{itemize}
+\item CMake version 3.1.0 or higher
+\item \CC\ compiler that supports C++11 features such as:
+  \begin{itemize}
+  \item regex
+  \item constexpr
+  \item default constructors
+  \end{itemize}
+\item \CC\ support for POSIX threads (pthreads) 
+\end{itemize}
+It is known that GCC version 4.9 or greater and clang 3.1 or greater
+with libc\texttt{++} are both supported. But to error on the side of caution,
+the most up to date and stable version of GCC is recommended. As often
+high-performance computing clusters do not possess recent versions of
+\CC\ compilers, it is therefore recommended that the software is built
+and executed in some sort of virtual environment. We have had success
+with Singularity and Docker for these special cases, though if a
+modern compiler is available, that can be used instead.
+
+The aforementioned dependencies are the bare minimum to obtain
+anything useful out of the tool. However, it is strongly recommended,
+and necessary in some our pipelines, that biological computing tools
+are also available. In particular, the Samtools suite is useful since
+the output database will be in a SAM file format. There are also
+bindings for the tool in several programming languages that may help
+users to interface with the Guidescan2 databases programatically.
+
+Helper scripts for various pipelines require a Python3 and Conda
+installation. We include a Conda environment file that contains all
+the necessary dependencies, though the scripts should run fine if
+standard data science packages are installed. 
+
+\subsection{Build Procedure}
+Building the off-target enumeration tool, Guidescan2, is
+straightforward usign CMake once the dependencies have been
+installed. First set the working directory to the guidescan-cli
+project root. Then execute the following commands.
+
+\begin{minted}[frame=lines]{bash}
+  $ mkdir build; cd build
+  $ cmake -DCMAKE_BUILD_TYPE=RELEASE ..
+  $ make
+\end{minted}
+
+The executable will be output in the \texttt{build/bin/} directory
+under the name \texttt{guidescan}. To make things convenient, we
+recommend that you add the program to your path. One way to do this is
+to place the executable under \texttt{\$HOME/bin/} and then append
+this directory to your
+\texttt{\$PATH}. The following code snippet does this and then
+permanently updates your \texttt{\$PATH} in your bashrc.
+
+\begin{minted}[frame=lines]{bash}
+  $ mkdir -p $HOME/bin
+  $ cp bin/guidescan $HOME/bin
+  $ echo export PATH=$PATH:$HOME/bin >> ~/.bashrc
+  $ source ~/.bashrc
+\end{minted}
+
+\section{Command Line Interface}
+For ease of exposition, we will assume Guidescan2 is installed under
+your path and can be executed by simply running the command
+$\texttt{guidescan}$. However, everything will apply even if you
+execute Guidescan2 using its absolute path.
+
+To run the Guidescan2 off-target enumeration and view its
+sub-commands, simply execute the program with the \texttt{--help}
+flag.
+\begin{minted}[frame=lines]{bash}
+  $ guidescan --help
+\end{minted}
+
+There are three sub-commands for the Guidescan2 tool. 
+\begin{itemize}
+\item \texttt{index}: Constructs a genomic index from a FASTA file.
+\item \texttt{enumerate}: Enumerates off-targets against a reference
+  genomic index for a particular set of kmers. 
+\item \texttt{http-server}: Spawns a local http-server that responds
+  to off-target queries. That is, for a GET request containing a
+  sequence of interest, enumerates all off-targets for that sequence.
+\end{itemize}
+The sub-commands each have their own interfaces, accessed as such:
+\begin{minted}[frame=lines]{bash}
+  $ guidescan [SUBCOMMAND] --help
+\end{minted}
+For almost all use cases, it will suffice to stick to the main
+\texttt{enumerate} and \texttt{index} commands, the others are only
+helpers for very specific purposes.
+
+\subsection{Genome Indexing}
+
+\begin{minted}[frame=lines]{bash}
+  $ guidescan index --help
+\end{minted}
+
+The \texttt{index} sub-command takes a FASTA file as input and
+constructs a compressed genomic index that is used for off-target
+search. The index is stored as three files in the current working
+directory with the name \texttt{*.index.*}. The index
+consists of a forward and reverse strand index as well as a small
+metadata file containing chromosome information. Auxiliary files with
+extensions \texttt{.forward.fna} and \texttt{.reverse.fna} are written
+to disk during the indexing process but these can be deleted once the
+genome is constructed.
+
+The \texttt{index} step is the only step that requires a decent amount
+of memory to execute. For the human reference genome, 32GB of memory
+will suffice. However once the indices are constructed they can be
+transferred across devices as they are relatively small. Indices for a
+wide variety of genomes are available at ????. And though this steps
+requires a moderate amount of memory, it is quick to execute, taking
+under ten minutes on a standard laptop.
+
+\subsection{Off-Target Enumeration}
+\begin{minted}[frame=lines]{bash}
+  $ guidescan enumerate --help
+\end{minted}
+
+Once an index is constructed, off-target enumeration proceeds in an
+online fashion with the \texttt{enumerate} sub-command. Input to this
+command is a pointer to a reference index and a set of kmers to
+evaluate off-targets against. PAMs are included in this kmer set and
+are matched at the specified end of the kmer. The output is a database
+in SAM file format containing kmers that have passed the Guidescan2
+filtering step. Complete off-target information is hex-encoded in the
+\texttt{of} field and can be decoded using an included Python3 script
+described later.
+
+The command understands several options. Most importantly is the flag
+\texttt{-k/--mismatches} that describes the mismatch radius to search
+for kmer matches within. Typically, this parameter is set to a small
+value of, typically at most 3 or 4, as the search complexity grows
+exponentially with this parameter. Second, it is often useful to
+specify an alternative set of PAMs to match off-targets against since
+different CRISPR systems have varying PAM specificity. Of course this
+step can be emulated using repeated calls to \texttt{enumerate} with
+different PAMs, but we include this as a feature for
+convenience. Multi-threading across cores is available with the
+\texttt{--threads} option. This may result in out of order entries
+compared to the input kmer set since threads may complete off-target
+enumeration at different speeds.
+
+We should also note that kmers that have multiple perfect matches are
+thrown away by default. This behavior can be turned off...
+
+The enumerate command {\bf requires} a set of genomic sequences to
+evaluate, we refer to these as the {\it kmer set}. The kmer set is
+specified in a very flexible CSV format described below. It can be
+automatically generated by the tool or manually specified. The kmer
+set consists of six columns:
+
+\begin{center}
+  \texttt{id,sequence,pam,chromosome,position,sense} 
+\end{center}
+
+of which only \texttt{id}, \texttt{sequence} and \texttt{sense} are
+required, though all must be specified in the header. An example is
+shown in (Figure \ref{fig:kmer_set}). Notice that for the third
+example, we don't specify a PAM. In this case, we simply match
+off-targets against the kmer with no regards to PAM specificity --
+off-targets don't need a PAM.
+
+\begin{figure}[ht]
+  \centering
+  \begin{minted}[frame=lines]{bash}
+id,sequence,pam,chromosome,position,sense
+ce11_example_1,GCCGTTCAGGAGCTCGACGA,NGG,chrIV,5499,-
+ce11_example_2,CAAAATATGAAATTTTCAAG,NGG,chrIV,23896,+
+ce11_example_3,TCTACTGAAAGTTTGCAAAA,,chrIV,5499,-
+ce11_example_4,TATAAACTGTCAAAGTTGAG,NGG,chrIV,23703,+
+  \end{minted}
+  \caption{\label{fig:kmer_set}: An example kmer file for the
+    Caenorhabditis elegans genome.}
+\end{figure}
+
+\subsection{Kmer Set Generation}
+As mentioned earlier, {\it kmer set} generation can be peformed manually,
+for example, when you want to evaluate a specific set of gRNAs.
+Additionally, Guidescan2 can also generate {\it kmer set} automatically.
+To generate {\it kmer sets} we include a Python3 script,
+\texttt{generate\_kmers.py}, that generates a set of kmers against an
+input FASTA file. To use the script simply write
+\begin{minted}[frame=lines]{bash}
+  $ python generate_kmers.py FASTA_FILE 
+\end{minted}
+and the output CSV will be sent directly to \texttt{stdout}.
+
+The script understands several options, though it is only mandatory to
+specify the FASTA file with which kmers are scanned. Additionally, one
+can specify PAM and kmer length, with defaults set to NGG and 20. By
+default kmers are only generated from chromosomes that are
+sufficiently long, but this can be specified using the
+\texttt{--min-chr-length} option. It also uses positional information
+as an identifier, but an additional prefix can be specified using the
+\texttt{--prefix} option.
+
+The dependencies for the script are Python3 and the Biopython toolkit.
+
+\section{Off-Target Databases}
+Guidescan2 outputs databases in the SAM file format, a common file
+format used in Bioinformatics. At minimum, the Guidescan2 database
+contains the off-target set for each screened kmer as well as
+chromosomal structure information. Importantly, \textbf{the header is
+  essential} for downstream processing; take care to not delete it
+accidently. The additional fields position, chromosome, and strand are
+filled in only if they are specified in the {\it kmer set} for the
+corresponding kmer. 
+
+Though convenient for storage, compression, and a variety of
+bioinformatics tasks, the off-target information is difficult to pull
+out. Namely, off-target information is hex-encoded in the attributes
+field with label \texttt{of} and is not human-readable. As such, we
+include a script to decode the off-target information into
+human-readable format.
+
+\subsection{Decoding}
+
+The script \texttt{decode\_kmers.py} is a Python3 script that decodes
+Guidescan2 databases sequentially into a human-readable CSV format. It
+takes the Guidescan2 SAM/BAM database and the original FASTA file as
+input and outputs a CSV to \texttt{stdout}. The script outputs
+information in two modes, denoted {\it succinct} and {\it
+  complete}, which we will describe below.
+
+For most use cases {\it succinct} mode will be sufficient. In this
+mode each kmer's off-targets are decoded and the information is
+summarized into multiple columns. Namely, we ouput the counts for
+matches at various distances and an overall score denoted specificity
+which is defined in the Supplementary Text. We note that the
+specificity is only defined for 20-mers with NGG PAMs; this column of
+the output will be empty otherwise. We also include additional
+metadata with obvious meaning upon examination.
+
+In {\it complete} mode we explicitly write out the sequence and
+genomic location of all off-targets for each kmer. In addition, in the
+20-mer case we include the CFD score from which our specificity score
+is derived. We warn that since some kmers can have up to hundreds of
+thousands of off-targets, {\it complete} mode can result in an
+extremely large output. If this is of concern we recommend that you
+re-run Guidescan2 with a smaller value of mismatch parameter and then
+decode the databases again.
+
+To run the script simply write,
+\begin{minted}[frame=lines]{bash}
+  $ python scripts/decode_database.py GUIDESCAN_SAM_DB FASTA_FILE 
+\end{minted}
+The script \textbf{depends} on the two pickled files in the
+subdirectory \texttt{scripts/cfd/}. As such, it is required that the
+script and the sub-directory \texttt{scripts/cfd/} are in the location
+for the program to properly execute. By default this is the
+case, but we caution that when moving the script, move the
+\texttt{scripts/cfd/} sub-directory as well.
+
+\section{Guidescan2 Pipelines}
+\subsection{Analysis of Individual gRNAs}
+%Here we introduce a pipeline for the analysis of a small set of gRNAs
+%that have been gathered from external sources. In our example, we will
+%load the 
+
+\subsection{Off-Target Database Construction}
+\subsection{Off-Target Database Construction for F1-Cross Genomes}
+
+\section{Miscellaneous Features}
+
+\end{document}

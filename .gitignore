@@ -2,6 +2,12 @@ Make.helper
 build/*
 typings/
 typings/*
+manual/_minted-manual/
+manual/_minted-manual/*
+manual/manual.log
+manual/manual.aux
+manual/manual.toc
+manual/manual.synctex.gz
 pyrightconfig.json
 build/
 bin/
