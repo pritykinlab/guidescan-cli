@@ -59,7 +59,7 @@ def generate_pam_set(pam):
 
     return pam_stack
 
-def find_kmers(pam, k, chrm, forward=False):
+def find_kmers(pam, k, chrm, forward=True):
     index = 0
 
     while True:
@@ -72,7 +72,7 @@ def find_kmers(pam, k, chrm, forward=False):
             kmer = chrm[index - k:index]
             position = index - k
         else:
-            kmer = chrm[index + len(pam):index + k]
+            kmer = chrm[index + len(pam):index + k + len(pam)]
             position = index
 
         index += 1
