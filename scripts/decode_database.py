@@ -120,6 +120,7 @@ def decode_off_targets(sam_record, genome, delim, fasta_record_dict):
 
         if len(offtarget) == 23:
             seq = revcom(offtarget) if strand == '-' else offtarget 
+            sgrna = revcom(sgrna) if strand == '-' else sgrna
             cfd = calc_cfd(sgrna, seq[:20], seq[21:23])
         else:
             cfd = None
@@ -159,13 +160,14 @@ def output_succinct(record, offtargets):
     sense = '-' if record.is_reverse else '+'
     
     match_counts = [0, 0, 0, 0]
+    cfd_sum = None
     if offtargets:
         cfd_sum = sum((offtarget['cfd'] for offtarget in offtargets))
         for offtarget in offtargets:
             match_counts[offtarget['distance']] += 1
 
     if cfd_sum:
-        specificity = 1 / cfd_sum
+        specificity = 1 / ((1 - min(1, match_counts[0])) + cfd_sum)
         if cfd_sum == 0:
             specificity = 1
     else:

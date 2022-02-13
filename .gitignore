@@ -25,3 +25,7 @@ _deps
 *.pyc
 *.o
 #*#
+db.sam
+kmers.csv
+manual/manual.out
+processed.csv

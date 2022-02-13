@@ -16,6 +16,7 @@
 \usepackage{booktabs} % To thicken table lines
 
 \usepackage{fancyhdr}
+
 \fancyhead{} % Clear the headers
 \renewcommand{\headrulewidth}{0pt} % Width of line at top of page
 \fancyhead[L]{\slshape\leftmark} % Mark right [R] of page with Chapter name [\leftmark]
@@ -155,7 +156,8 @@ will suffice. However once the indices are constructed they can be
 transferred across devices as they are relatively small. Indices for a
 wide variety of genomes are available at ????. And though this steps
 requires a moderate amount of memory, it is quick to execute, taking
-under ten minutes on a standard laptop.
+under thirty minutes on a Lenovo Thinkpad t490 with 32GB of RAM and an
+8-core processor.
 
 \subsection{Off-Target Enumeration}
 \begin{minted}[frame=lines]{bash}
@@ -299,11 +301,195 @@ case, but we caution that when moving the script, move the
 
 \section{Guidescan2 Pipelines}
 \subsection{Analysis of Individual gRNAs}
-%Here we introduce a pipeline for the analysis of a small set of gRNAs
-%that have been gathered from external sources. In our example, we will
-%load the 
+Here we introduce a pipeline for the analysis of a small set of gRNAs
+that have been gathered from external sources. In our example, we will
+analyze a subset of genes targeted in a CRISPRko essentiality screen
+\hl{(Sabatini ref)}.  The files for this example can be found in the
+aforementioned publication, but are included as CSV files in the
+\texttt{examples/} sub-directory. The two files we will use contain
+the set of gRNAs used in the knockout screen
+(\texttt{sabatini\_grnas.csv}) and gRNA abundance after harvesting at
+initial and final time points (\texttt{sabatini\_read\_counts.csv}). 
+
+To start we will index the reference genome to analyze off-targets
+against. Since the Sabatini2015 screen is performed in human cells,
+the human reference genome \textit{hg38} is a natural choice. We will
+use the RefSeq version of this reference genome which is provided by
+the National Center for Biotechnology Information at the address:
+
+\begin{center}
+\texttt{https://www.ncbi.nlm.nih.gov/assembly/GCF\_000001405.26/}
+\end{center}
+
+Once downloaded the reference genome must be decompressed into a raw
+FASTA file.  To do this one can run the following sequence of
+commands, assuming the downloaded tarball has name \texttt{hg38.tar}.
+
+\begin{minted}[frame=lines]{bash}
+  $ tar -xvf hg38.tar
+  $ cd ncbi-genomes-2022-tarball
+  $ gunzip GCF_000001405.26_GRCh38_genomic.fna.gz
+\end{minted}
+
+It will also be useful to include the file \texttt{chr2acc} which maps
+chromosome names to NCBI accessions, which are used internally in
+Guidescan2. For example, this file can be found on the NCBI FTP server
+at the location:
+
+\begin{center}
+\texttt{.../Primary\_Assembly/assembled\_chromosomes/chr2acc}
+\end{center}
+
+and it takes the form in (Figure \ref{fig:chr2acc}).
+
+\begin{figure}[t]
+  \centering
+  \begin{minted}[frame=lines]{text}
+#Chromosome	Accession.version
+1	NC_000001.11
+2	NC_000002.12
+3	NC_000003.12
+...
+X	NC_000023.11
+Y	NC_000024.10
+    \end{minted}
+    \caption{\label{fig:chr2acc} chr2acc file that maps standard
+      chromosome names to NCBI accession identifiers. Guidescan2 uses
+      these identifiers internally since they uniquely identify
+      organism version and chromosome simultaneously. }
+\end{figure}
+
+
+Now, since the reference genome is a raw FASTA file, we can run
+Guidescan2 indexing on it as follows. Note that this step can require
+up to 32GB of memory for large genomes. When generating the index for
+\textit{hg38}, this step took a maximum of 30GB of memory. Large
+temporary files with extension \texttt{.sdsl} will be created and
+subsequently deleted during this process.
+
+\begin{minted}[frame=lines]{bash}
+  $ guidescan index --index hg38 GCF_000001405.26_GRCh38_genomic.fna
+  $ rm GCF_000001405.26_GRCh38_genomic.fna.*.dna
+\end{minted}
+
+Note that we specify the prefix to ensure the commands are short and
+delete the temporary files \texttt{*.dna} once the index has been
+constructed. If memory constraints are an issue, we remind the user
+that pre-constructed indices can be found \hl{here}.
+
+With the index constructed, we then turn to processing the gRNAs into
+the {\it kmer set} format for processing by Guidescan2. For the sake
+of example, we will randomly select of 250 genes to process.
+
+\begin{minted}[frame=lines]{bash}
+  $ awk -F, '(NR > 1) { print $1 }' examples/sabatini_grnas.csv > id_list.txt
+  $ cat id_list.txt | sed -e '/CTRL.*/d' | sed -r 's/sg(.*)_.*/\1/' > gene_list.txt
+  $ uniq gene_list.txt | shuf | head -n 250 > random_genes.txt
+  $ cat random_genes.txt | sed -r 's/.*/sg\0_/' > random_gene_ids.txt
+\end{minted}
+
+The preceding code grabs the \texttt{sgRNA ID} field of the CSV, drops
+all control gRNAs, parses the gene, removes duplicates, and then
+finally selects a random subset of genes. We include this as an
+illustrative example of the custom processing that may need to
+performed in order to analyze your gRNA set; it differs from dataset
+to dataset.
+
+With all the genes we want to analyze selected, we finally construct
+our {\it kmers set}. We do this by selecting all gRNAs in our gene
+set, sorting the rows, appending a PAM column, and adding in
+our header. We also delete the temporary files that are no longer
+needed.
+
+\begin{minted}[frame=lines]{bash}
+  $ grep -f random_gene_ids.txt examples/sabatini_grnas.csv > grnas.csv
+  $ awk -F, '{ print $1 "," $6 ",NGG," $3","$4","$5 }' grnas.csv > kmers.csv
+  $ sed -i '1i id,sequence,pam,chromosome,position,sense' kmers.csv
+  $ rm id_list.txt gene_list.txt random_genes.txt random_gene_ids.txt grnas.csv
+\end{minted}
+
+At this point, it is convenient (though not necessary) to update the
+chromosome names with NCBI accessions. As an example, we include the
+following Python script \texttt{examples/chr2acc.py} that will perform
+this update (Figure \ref{fig:chr2accpy}). We do not include a general
+solution to this problem since it depends on the format of the gRNA
+given to analyze, but for the example simply execute the following.
+
+\begin{minted}[frame=lines]{bash}
+  $ python examples/chr2acc.py chr2acc.txt kmers.csv > kmers2.csv
+  $ mv kmers2.csv kmers.csv
+\end{minted}
+
+\begin{figure}[ht]
+  \centering
+  \begin{minted}[frame=lines]{python}
+import sys
+
+if len(sys.argv) < 3:
+    print("usage: python chr2acc.py [chr2acc.txt] [kmers.csv]")
+    sys.exit(1)
+
+chr2acc = {}
+with open(sys.argv[1]) as f:
+    next(f)
+    for l in f:
+        words = l.split() 
+        chr2acc[words[0]] = words[1]
+
+with open(sys.argv[2]) as f:
+    print(next(f), end='')
+    for l in f:
+        words = l.split(',')
+        words[3] = chr2acc[words[3][3:]] # strips 'chr' prefix
+        print(','.join(words), end='')
+  \end{minted}
+  \caption{\label{fig:chr2accpy} An example script for mapping
+    chromosome to accession names.}
+\end{figure}
+
+Finally, our {\it kmer set} is ready to run through Guidescan2. After
+moving everything to the correct directory, we can evaluate our {\it
+  kmer set} with the following command.  \vspace{-0.8em}
+\begin{minted}[frame=lines]{bash}
+  $ guidescan enumerate ~/ncbi-*/hg38 -f kmers.csv -n 1 -o db.sam -a NAG
+\end{minted}
+As an estimate of time, this process took less than 10 minutes on a
+Thinkpad t490. Since kmers are evaluated synchronously and written in
+real time, progress can be measured via the number of lines in the
+output database. That is,
+\vspace{-0.8em}
+\begin{minted}[frame=lines]{bash}
+  $ wc -l db.sam
+\end{minted}
+tells you how many kmers have successfully been processed by Guidescan2.
+
+To make our output human readable, we run our decoding script on the
+output database, passing in the reference FASTA file as input.
+\vspace{-0.8em}
+\begin{minted}[frame=lines]{bash}
+  $ python scripts/decode_database.py db.sam ~/ncbi-*/*.fna > processed.csv
+\end{minted}
+
+Finally, we are done! To enable the analysis of large sets of kmers,
+say on the order of $10^6$ kmers, we recommend either reducing the
+mismatch to 2 or parallelizing across several compute nodes. The
+following sections on off-target database construction describe simple
+strategies for parallelization.
 
 \subsection{Off-Target Database Construction}
+
+Here we describe a complete program to construct genome-wide
+off-target databases for organisms. To make this example run quickly,
+we will construct a databse for the C. elegans genome. An in
+particular, we will use the RefSeq version provided by the National
+Center for Biotechnology Information at the address:
+
+\begin{center}
+  \texttt{https://www.ncbi.nlm.nih.gov/assembly/GCF\_000002985.6/}
+\end{center}
+
+
+
 \subsection{Off-Target Database Construction for F1-Cross Genomes}
 
 \section{Miscellaneous Features}

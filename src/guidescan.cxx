@@ -182,7 +182,10 @@ int do_index_cmd(const index_cmd_options& opts) {
     }
 
     cout << "Constructing genome index..." << endl;
+
     genomics::genome_structure gs;
+    fasta_is.clear();
+    fasta_is.seekg(0);
     gs = genomics::seq_io::parse_genome_structure(fasta_is);
     genomics::seq_io::write_to_file(gs, genome_structure_file);
 
