@@ -29,3 +29,7 @@ db.sam
 kmers.csv
 manual/manual.out
 processed.csv
+manual/manual.bbl
+manual/manual.bcf
+manual/manual.blg
+manual/manual.run.xml

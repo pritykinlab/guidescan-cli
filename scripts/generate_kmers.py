@@ -101,7 +101,6 @@ def output_kmer(prefix, chrm_name, kmer):
 if __name__ == "__main__":
     args = parse_arguments()
 
-
     print("id,sequence,pam,chromosome,position,sense")
     for record in SeqIO.parse(args.fasta, "fasta"):
         if len(record) < args.min_chr_length:

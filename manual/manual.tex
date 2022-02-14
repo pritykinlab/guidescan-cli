@@ -15,7 +15,11 @@
 \usepackage[labelfont=bf]{caption}
 \usepackage{booktabs} % To thicken table lines
 
+\usepackage[citestyle=alphabetic,bibstyle=numeric]{biblatex}
+\addbibresource{manual.bib}
+
 \usepackage{fancyhdr}
+\usepackage{hyperref}
 
 \fancyhead{} % Clear the headers
 \renewcommand{\headrulewidth}{0pt} % Width of line at top of page
@@ -31,8 +35,12 @@
     +}\nolinebreak\hspace{-.10em}\raisebox{.4ex}{\tiny\bf +}}
 \def\CC{{C\nolinebreak[4]\hspace{-.05em}\raisebox{.4ex}{\tiny\bf ++}}}
 
-\author{Henri Schmidt}
+\author{Henri Schmidt$^1$}
 \title{Guidescan2 Software Manual}
+\date{
+    $^1$Department of Computer Science, Princeton University\\[2ex]%
+    \today
+}
 
 \begin{document}
 
@@ -68,9 +76,10 @@ The aforementioned dependencies are the bare minimum to obtain
 anything useful out of the tool. However, it is strongly recommended,
 and necessary in some our pipelines, that biological computing tools
 are also available. In particular, the Samtools suite is useful since
-the output database will be in a SAM file format. There are also
-bindings for the tool in several programming languages that may help
-users to interface with the Guidescan2 databases programatically.
+the output database will be in a SAM file format
+\parencite{danecek2021twelve}. There are also bindings for the tool in
+several programming languages that may help users to interface with
+the Guidescan2 databases programatically.
 
 Helper scripts for various pipelines require a Python3 and Conda
 installation. We include a Conda environment file that contains all
@@ -83,7 +92,7 @@ straightforward usign CMake once the dependencies have been
 installed. First set the working directory to the guidescan-cli
 project root. Then execute the following commands.
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ mkdir build; cd build
   $ cmake -DCMAKE_BUILD_TYPE=RELEASE ..
   $ make
@@ -97,7 +106,7 @@ this directory to your
 \texttt{\$PATH}. The following code snippet does this and then
 permanently updates your \texttt{\$PATH} in your bashrc.
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ mkdir -p $HOME/bin
   $ cp bin/guidescan $HOME/bin
   $ echo export PATH=$PATH:$HOME/bin >> ~/.bashrc
@@ -113,7 +122,7 @@ execute Guidescan2 using its absolute path.
 To run the Guidescan2 off-target enumeration and view its
 sub-commands, simply execute the program with the \texttt{--help}
 flag.
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ guidescan --help
 \end{minted}
 
@@ -127,7 +136,7 @@ There are three sub-commands for the Guidescan2 tool.
   sequence of interest, enumerates all off-targets for that sequence.
 \end{itemize}
 The sub-commands each have their own interfaces, accessed as such:
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ guidescan [SUBCOMMAND] --help
 \end{minted}
 For almost all use cases, it will suffice to stick to the main
@@ -136,7 +145,7 @@ helpers for very specific purposes.
 
 \subsection{Genome Indexing}
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ guidescan index --help
 \end{minted}
 
@@ -160,7 +169,7 @@ under thirty minutes on a Lenovo Thinkpad t490 with 32GB of RAM and an
 8-core processor.
 
 \subsection{Off-Target Enumeration}
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ guidescan enumerate --help
 \end{minted}
 
@@ -205,12 +214,12 @@ of which only \texttt{id}, \texttt{sequence} and \texttt{sense} are
 required, though all must be specified in the header. An example is
 shown in (Figure \ref{fig:kmer_set}). Notice that for the third
 example, we don't specify a PAM. In this case, we simply match
-off-targets against the kmer with no regards to PAM specificity --
+off-targets against the kmer with no regards to PAM specificity ---
 off-targets don't need a PAM.
 
 \begin{figure}[ht]
   \centering
-  \begin{minted}[frame=lines]{bash}
+  \begin{minted}[frame=lines]{text}
 id,sequence,pam,chromosome,position,sense
 ce11_example_1,GCCGTTCAGGAGCTCGACGA,NGG,chrIV,5499,-
 ce11_example_2,CAAAATATGAAATTTTCAAG,NGG,chrIV,23896,+
@@ -228,7 +237,7 @@ Additionally, Guidescan2 can also generate {\it kmer set} automatically.
 To generate {\it kmer sets} we include a Python3 script,
 \texttt{generate\_kmers.py}, that generates a set of kmers against an
 input FASTA file. To use the script simply write
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ python generate_kmers.py FASTA_FILE 
 \end{minted}
 and the output CSV will be sent directly to \texttt{stdout}.
@@ -289,7 +298,7 @@ re-run Guidescan2 with a smaller value of mismatch parameter and then
 decode the databases again.
 
 To run the script simply write,
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ python scripts/decode_database.py GUIDESCAN_SAM_DB FASTA_FILE 
 \end{minted}
 The script \textbf{depends} on the two pickled files in the
@@ -304,12 +313,12 @@ case, but we caution that when moving the script, move the
 Here we introduce a pipeline for the analysis of a small set of gRNAs
 that have been gathered from external sources. In our example, we will
 analyze a subset of genes targeted in a CRISPRko essentiality screen
-\hl{(Sabatini ref)}.  The files for this example can be found in the
+\parencite{Wang1096}.  The files for this example can be found in the
 aforementioned publication, but are included as CSV files in the
 \texttt{examples/} sub-directory. The two files we will use contain
 the set of gRNAs used in the knockout screen
 (\texttt{sabatini\_grnas.csv}) and gRNA abundance after harvesting at
-initial and final time points (\texttt{sabatini\_read\_counts.csv}). 
+initial and final time points (\texttt{sabatini\_read\_counts.csv}).
 
 To start we will index the reference genome to analyze off-targets
 against. Since the Sabatini2015 screen is performed in human cells,
@@ -325,7 +334,7 @@ Once downloaded the reference genome must be decompressed into a raw
 FASTA file.  To do this one can run the following sequence of
 commands, assuming the downloaded tarball has name \texttt{hg38.tar}.
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ tar -xvf hg38.tar
   $ cd ncbi-genomes-2022-tarball
   $ gunzip GCF_000001405.26_GRCh38_genomic.fna.gz
@@ -359,7 +368,6 @@ Y	NC_000024.10
       organism version and chromosome simultaneously. }
 \end{figure}
 
-
 Now, since the reference genome is a raw FASTA file, we can run
 Guidescan2 indexing on it as follows. Note that this step can require
 up to 32GB of memory for large genomes. When generating the index for
@@ -367,7 +375,7 @@ up to 32GB of memory for large genomes. When generating the index for
 temporary files with extension \texttt{.sdsl} will be created and
 subsequently deleted during this process.
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ guidescan index --index hg38 GCF_000001405.26_GRCh38_genomic.fna
   $ rm GCF_000001405.26_GRCh38_genomic.fna.*.dna
 \end{minted}
@@ -381,7 +389,7 @@ With the index constructed, we then turn to processing the gRNAs into
 the {\it kmer set} format for processing by Guidescan2. For the sake
 of example, we will randomly select of 250 genes to process.
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ awk -F, '(NR > 1) { print $1 }' examples/sabatini_grnas.csv > id_list.txt
   $ cat id_list.txt | sed -e '/CTRL.*/d' | sed -r 's/sg(.*)_.*/\1/' > gene_list.txt
   $ uniq gene_list.txt | shuf | head -n 250 > random_genes.txt
@@ -401,7 +409,7 @@ set, sorting the rows, appending a PAM column, and adding in
 our header. We also delete the temporary files that are no longer
 needed.
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ grep -f random_gene_ids.txt examples/sabatini_grnas.csv > grnas.csv
   $ awk -F, '{ print $1 "," $6 ",NGG," $3","$4","$5 }' grnas.csv > kmers.csv
   $ sed -i '1i id,sequence,pam,chromosome,position,sense' kmers.csv
@@ -415,7 +423,7 @@ this update (Figure \ref{fig:chr2accpy}). We do not include a general
 solution to this problem since it depends on the format of the gRNA
 given to analyze, but for the example simply execute the following.
 
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ python examples/chr2acc.py chr2acc.txt kmers.csv > kmers2.csv
   $ mv kmers2.csv kmers.csv
 \end{minted}
@@ -450,7 +458,7 @@ with open(sys.argv[2]) as f:
 Finally, our {\it kmer set} is ready to run through Guidescan2. After
 moving everything to the correct directory, we can evaluate our {\it
   kmer set} with the following command.  \vspace{-0.8em}
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ guidescan enumerate ~/ncbi-*/hg38 -f kmers.csv -n 1 -o db.sam -a NAG
 \end{minted}
 As an estimate of time, this process took less than 10 minutes on a
@@ -458,7 +466,7 @@ Thinkpad t490. Since kmers are evaluated synchronously and written in
 real time, progress can be measured via the number of lines in the
 output database. That is,
 \vspace{-0.8em}
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ wc -l db.sam
 \end{minted}
 tells you how many kmers have successfully been processed by Guidescan2.
@@ -466,7 +474,7 @@ tells you how many kmers have successfully been processed by Guidescan2.
 To make our output human readable, we run our decoding script on the
 output database, passing in the reference FASTA file as input.
 \vspace{-0.8em}
-\begin{minted}[frame=lines]{bash}
+\begin{minted}[frame=lines]{shell-session}
   $ python scripts/decode_database.py db.sam ~/ncbi-*/*.fna > processed.csv
 \end{minted}
 
@@ -477,21 +485,229 @@ following sections on off-target database construction describe simple
 strategies for parallelization.
 
 \subsection{Off-Target Database Construction}
+\label{subsec:offtargetdb}
 
-Here we describe a complete program to construct genome-wide
-off-target databases for organisms. To make this example run quickly,
-we will construct a databse for the C. elegans genome. An in
-particular, we will use the RefSeq version provided by the National
-Center for Biotechnology Information at the address:
+Here we describe a program to construct genome-wide off-target
+databases for organisms. To ensure this example runs quickly, we will
+construct a databse for the C. elegans genome. An in particular, we
+will use the RefSeq version provided by the National Center for
+Biotechnology Information at the address:
 
 \begin{center}
   \texttt{https://www.ncbi.nlm.nih.gov/assembly/GCF\_000002985.6/}
 \end{center}
 
+Once downloaded the reference genome must be decompressed into a raw
+FASTA file.  To do this one can run the following sequence of
+commands, assuming the downloaded tarball has name \texttt{cell.tar}.
 
+\begin{minted}[frame=lines]{shell-session}
+  $ tar -xvf cell.tar
+  $ cd ncbi-genomes-2022-tarball
+  $ gunzip GCF_000002985.6_WBcel235_genomic.fna.gz
+\end{minted}
+
+Now, since the reference genome is a raw FASTA file, we can run
+Guidescan2 indexing on it as follows. Note that this step can require
+up to 32GB of memory for large genomes. When generating the index for
+\textit{hg38}, this step took a maximum of 30GB of memory. Large
+temporary files with extension \texttt{.sdsl} will be created and
+subsequently deleted during this process.
+
+\begin{minted}[frame=lines]{shell-session}
+  $ guidescan index --index cell.index GCF_000002985.6_WBcel235_genomic.fna
+  $ rm GCF_000002985.6_WBcel235_genomic.fna.*.dna
+\end{minted}
+
+Note that we specify the prefix to ensure the commands are short and
+delete the temporary files \texttt{*.dna} once the index has been
+constructed. If memory constraints are an issue, we remind the user
+that pre-constructed indices can be found \hl{here}.
+
+At this point, we will deviate from the analysis in the previous
+section. Instead of looking at a targeted set of gRNAs received from a
+third-party, we will construct a genome wide set of gRNAs using
+Guidescan2. To do this we need to specify the {\it targetable space}
+of the genome. For standard CRISPR Cas9 enzymes, this corresponds to
+the set of all 20-mers followed by NGG PAMs; but it varies across
+CRISPR systems. Accordingly, we run the \texttt{generate\_kmers.py}
+script with our desired parameters.
+
+\begin{minted}[frame=lines]{shell-session}
+  $ python scripts/generate_kmers.py --pam NGG --prefix "example-"\
+    cell.fna > cell.kmers
+\end{minted}
+
+To enable parallel execution, we partition our kmer set across 100
+pieces. The *nix \texttt{split} utility is useful for this
+purpose. And then we append the header to each split. Since this is a
+little bit more complex, we include it as a script (Figure
+\ref{fig:splitkmers}). With the kmers set split into pieces, we can
+run Guidescan2 seperately on each piece and then merge the resulting
+SAM files together. The exact steps necessary depend upon on the
+computing resources available, but it should be straightforward. As an
+example, we will enumerate gRNAs in a sequential fashion.
+
+\begin{minted}[frame=lines]{shell-session}
+  $ for f in cell.*.csv; do\
+  guidescan enumerate ce11.index -f $f -n 1 -o $f.sam -a NAG;\
+  done
+\end{minted}
+
+Note that this step would take a \textbf{very} long time to complete
+if run sequentially. For the example here, it would take around 1,000
+minutes running on a single core on a Thinkpad t490; the time would
+increase exponentially for organisms with longer genomes. Assuming
+this step is completed, we finish database construction by merging the
+databases together. To do this, we strip the headers from all but one
+of the files and concatenate them together. This can be done using
+samtools, but here we will just use \texttt{sed} and \texttt{cat}.
+
+\begin{minted}[frame=lines]{shell-session}
+  $ cp cell.000.sam cell.sam
+  $ sed -E "/@.*/d" cell.*{1..99}.csv.sam >> cell.sam
+\end{minted}
+
+And at this step, database generation is complete. For storage, we
+recommend compressing the file to a BAM format using Samtools. To make
+our output human readable, we can run our decoding script on the
+output database, or subsets thereof, passing in the reference FASTA
+file as input. Remember to keep the header when splitting the database
+into subsets. It can also be convenient to perform this step on the
+individual database splits in parallel, though this step is very
+quick.
+
+\vspace{-0.8em}
+\begin{minted}[frame=lines, breaklines]{shell-session}
+  $ python scripts/decode_database.py cell.sam\ GCF_000002985.6_WBcel235_genomic.fna > ce11.csv
+\end{minted}
+
+\begin{figure}[ht]
+  \centering
+\begin{minted}[frame=lines]{bash}
+#!/bin/bash
+
+split -d -n l/100 -a 3 --additional-suffix .csv cell.kmers cell.
+for f in cell.*.csv; do
+    awk 'BEGIN {print "id,sequence,pam,chromosome,position,sense"} {print $1}'\
+        $f > $f.header
+    mv $f.header $f
+done
+
+# first file contains two headers now; we remove
+tail -n +2 cell.000.csv > tmp.csv
+mv tmp.csv cell.000.csv
+\end{minted}
+\caption{\label{fig:splitkmers} Bash script to split
+  \texttt{cell.kmers} file into 100 partitions for parallelization.}
+\end{figure}
 
 \subsection{Off-Target Database Construction for F1-Cross Genomes}
 
-\section{Miscellaneous Features}
+To construct databases for hybrid genomes and enable allele specific
+targeting, we need reference sequences for both alleles.  In our case
+of generating allele specific guides for an F1 hybrid B6/129S1 mouse
+genome, we used the \textit{mm38} reference genome and a synthetic
+\textit{129S1} genome. If high quality genomes and mappings between them are
+available for both alleles, then it is not necessary to generate a
+synthetic genome. But this was not the case for 129S1.
+
+We co-opted the MMARGE tool built for epigenetic data to construct
+both a \textit{129S1} reference genome and a mapping between
+\textit{129S1} and \textit{mm38} \parencite{link2018mmarge}. We used
+the reference assembly \texttt{GRCm38\_68.fa} from Ensemble release 68
+and the sequence variation files from the Mouse Genome Project
+\parencite{keane2011mouse}. At the time of publication, the VCF files
+are available for installation at:
+
+\begin{center}
+  \texttt{ftp://ftp-mouse.sanger.ac.uk}
+\end{center}
+
+Essentially, we pulled down the set of indels/SNPs as a VCF file and
+processed them for usage with MMARGE. We also split the genome into
+chromosomes, since this is required for processing. We refer the
+reader to \parencite{link2018mmarge} for full details on constructing
+synthentic genomes with MMARGE since it is rather detailed. However,
+we include the code we used for this in (Listing
+\ref{listing:mmarge}).
+
+At this point, we assume the reader has two reference genomes,
+referred to as \texttt{grcm38.fa} and \texttt{129s1.fa} and a mapping
+between the coordinates of the two. We now run Guidescan2 off-target
+database construction as in sub-section \ref{subsec:offtargetdb} for
+each of these genomes seperately. This will result in two Guidescan2
+databases \texttt{grcm38.sam} and \texttt{129s1.sam} for the
+corresponding references. These consist of the sets of gRNAs that have
+passed standard Guidescan2 filtering. From these databases, we
+construct two {\it kmer sets} and then run these against the indices
+for the opposite allele with a an exact match threshold of 0. This
+will result in two sets of gRNAs that have exact matches on only one
+allele, as well as complete off-target information for both alleles.
+
+%\section{Miscellaneous Features}
+
+\newpage
+\begin{minted}[frame=lines, breaklines]{bash}
+DIR=inputs/
+MMARGE=MMARGE.pl
+SNPS=$DIR/129S1_SvImJ.mgp.v5.snps.dbSNP142.vcf
+INDELS=$DIR/129S1_SvImJ.mgp.v5.indels.dbSNP142.normed.vcf
+
+mkdir -p $DIR
+
+if [ ! -f $SNPS ]; then
+    echo "Downloading and pre-processing latest SNP files for $(basename $SNPS)."
+    echo "======================================================================"
+    wget ftp://ftp-mouse.sanger.ac.uk/REL-1505-SNPs_Indels/strain_specific_vcfs/$(basename "$SNPS").gz -O "$SNPS".gz
+    gunzip "$SNPS".gz
+    grep "^#" $SNPS > "$SNPS".sorted
+    grep -v "^#" $SNPS | sort -k1,1 -k2,2n --parallel=24 >> "$SNPS".sorted
+fi
+
+if [ ! -f $INDELS ]; then
+    echo "Downloading and pre-processing latest INDEL files for $(basename $INDELS)."
+    echo "======================================================================"
+    wget ftp://ftp-mouse.sanger.ac.uk/REL-1505-SNPs_Indels/strain_specific_vcfs/$(basename "$INDELS").gz -O "$INDELS".gz
+    gunzip "$INDELS".gz
+    grep "^#" $INDELS > "$INDELS".sorted
+    grep -v "^#" $INDELS | sort -k1,1 -k2,2n --parallel=24 >> "$INDELS".sorted
+fi
+
+REF_FTP=$(head $INDELS | PERL_BADLANG=0 perl -Xne 'print $1 if /reference=(ftp.*)/')
+REF=$DIR/$(basename $REF_FTP)
+if [ ! -f $REF ]; then
+    echo "Installing reference genome from: $REF_FTP"
+    echo "======================================================================"
+    wget "$REF_FTP".gz -O $REF.gz
+    gunzip $REF.gz
+fi
+
+echo "Splitting genome into chromosomes."
+echo "======================================================================"
+
+if [ ! -f scripts/faSplit ]; then
+    wget http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v385/faSplit
+    chmod u+x scripts/faSplit
+fi
+
+mkdir -p genomes
+./scripts/faSplit byname $REF genomes/
+
+for f in genomes/*; do
+    mv $f genomes/chr$(basename $f)
+done
+
+echo "Preparing files with MMARGE"
+echo "======================================================================"
+
+$MMARGE prepare_files -core 8 -files "$SNPS".sorted "$INDELS.sorted" -genome genomes -dir . -genome_dir . 
+\end{minted}
+\captionof{listing}{\label{listing:mmarge} Example code to construct to synthetic
+  \textit{129S1} genome using MMARGE, including pre-processing steps.}
+
+\newpage
+\section{Bibliography}
+\printbibliography[heading=none]
 
 \end{document}
