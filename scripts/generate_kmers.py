@@ -14,7 +14,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--pam",
-        help="Length of kmers to generate.",
+        help="Protospacer adjacent motif to match.",
         default="NGG"
     )
 
@@ -34,6 +34,12 @@ def parse_arguments():
         "--prefix",
         help="Prefix to use for kmer identifiers.",
         default=""
+    )
+
+    parser.add_argument(
+        "--start",
+        help="Match PAM at start of kmer instead at end (default).",
+        action='store_true'
     )
 
     return parser.parse_args()
@@ -59,7 +65,7 @@ def generate_pam_set(pam):
 
     return pam_stack
 
-def find_kmers(pam, k, chrm, forward=True):
+def find_kmers(pam, k, chrm, forward=True, end=True):
     index = 0
 
     while True:
@@ -68,26 +74,34 @@ def find_kmers(pam, k, chrm, forward=True):
         if index == -1:
             break 
 
-        if forward:
-            kmer = chrm[index - k:index]
-            position = index - k
+        if end:
+            if forward:
+                kmer = chrm[index - k:index]
+                position = index - k
+            else:
+                kmer = chrm[index + len(pam):index + k + len(pam)]
+                position = index
         else:
-            kmer = chrm[index + len(pam):index + k + len(pam)]
-            position = index
+            if forward:
+                kmer = chrm[index + len(pam):index + k + len(pam)]
+                position = index
+            else:
+                kmer = chrm[index - k:index]
+                position = index - k
 
         index += 1
         yield (kmer.upper(), position)
 
-def find_all_kmers(pam, k, chrm):
+def find_all_kmers(pam, k, chrm, end=True):
     pam_set = generate_pam_set(pam)
     rev_pam_set = list(map(revcom, pam_set))
 
     for p in pam_set:
-        for kmer, pos in find_kmers(p, k, chrm):
+        for kmer, pos in find_kmers(p, k, chrm, end=end):
             yield {"sequence" : kmer, "position" : pos, "pam" : pam, "sense": "+"}
 
     for p in rev_pam_set:
-        for kmer, pos in find_kmers(p, k, chrm, forward=False):
+        for kmer, pos in find_kmers(p, k, chrm, forward=False, end=end):
             yield {"sequence" : revcom(kmer), "position" : pos,
                    "pam" : pam, "sense": "-"}
 
@@ -106,5 +120,5 @@ if __name__ == "__main__":
         if len(record) < args.min_chr_length:
             continue
 
-        for kmer in find_all_kmers(args.pam, args.kmer_length, record.seq):
+        for kmer in find_all_kmers(args.pam, args.kmer_length, record.seq, end=not args.start):
             output_kmer(args.prefix, record.name, kmer)
