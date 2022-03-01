@@ -42,7 +42,7 @@ namespace genomics {
     void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
                                 const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
                                 std::vector<std::string> pams, size_t mismatches,
-                                int threshold,
+                                int threshold, bool start,
                                 const kmer& k,
                                 std::ostream& output,
                                 std::mutex& output_mtx) {
@@ -66,18 +66,30 @@ namespace genomics {
             pams_c.push_back(genomics::reverse_complement(pam));
         }
         
-        std::string kmer = genomics::reverse_complement(k.sequence);
-        if (threshold > 0) {
+        std::string kmer = !start ? genomics::reverse_complement(k.sequence) : k.sequence;
+
+        if (threshold > 0 && !start) {
             gi_forward.inexact_search(kmer, pams_c, threshold, counting_callback, count);
             if (count > 1) return;
             gi_reverse.inexact_search(kmer, pams_c, threshold, counting_callback, count);
+            if (count > 1) return;
+        } else if (threshold > 0 && start) {
+            gi_forward.inexact_search(kmer, pams, threshold, counting_callback, count);
+            if (count > 1) return;
+            gi_reverse.inexact_search(kmer, pams, threshold, counting_callback, count);
             if (count > 1) return;
         }
 
         std::vector<std::set<std::tuple<size_t, size_t>>> forward_off_targets_bwt(mismatches + 1);
         std::vector<std::set<std::tuple<size_t, size_t>>> reverse_off_targets_bwt(mismatches + 1);
-        gi_forward.inexact_search(kmer, pams_c, mismatches, callback, forward_off_targets_bwt);
-        gi_reverse.inexact_search(kmer, pams_c, mismatches, callback, reverse_off_targets_bwt);
+
+        if (!start) {
+            gi_forward.inexact_search(kmer, pams_c, mismatches, callback, forward_off_targets_bwt);
+            gi_reverse.inexact_search(kmer, pams_c, mismatches, callback, reverse_off_targets_bwt);
+        } else {
+            gi_forward.inexact_search(kmer, pams, mismatches, callback, forward_off_targets_bwt);
+            gi_reverse.inexact_search(kmer, pams, mismatches, callback, reverse_off_targets_bwt);
+        }
 
         size_t genome_length = 0;
         for (size_t i = 0; i < gi_forward.gs.size(); i++) {
@@ -111,7 +123,7 @@ namespace genomics {
             }
         }
 
-        std::string sam_line = genomics::get_sam_line(gi_forward, k, off_targets);
+        std::string sam_line = genomics::get_sam_line(gi_forward, k, start, off_targets);
 
         output_mtx.lock();
         output << sam_line << std::endl;
@@ -190,7 +202,7 @@ namespace genomics {
     void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
                                  const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
                                  const std::vector<std::string> &pams,
-                                 size_t mismatches, int threshold,
+                                 size_t mismatches, int threshold, bool start,
                                  genomics::kmer_producer& kmer_p, std::mutex& kmer_mtx,
                                  std::ostream& output, std::mutex& output_mtx) {
         kmer out_kmer;
@@ -200,7 +212,8 @@ namespace genomics {
             kmer_mtx.unlock();
 
             if (!kmers_left) break;
-            process_kmer_to_stream(gi_forward, gi_reverse, pams, mismatches, threshold, out_kmer, output, output_mtx);
+            process_kmer_to_stream(gi_forward, gi_reverse, pams, mismatches, threshold,
+                                   start, out_kmer, output, output_mtx);
         }
     }
 }

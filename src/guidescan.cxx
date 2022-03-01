@@ -36,8 +36,8 @@ struct enumerate_cmd_options {
     size_t nthreads;
     CLI::Option* nthreads_opt = nullptr;
 
-    bool enumerate_all;
-    CLI::Option* enumerate_all_opt = nullptr;
+    bool start;
+    CLI::Option* start_opt = nullptr;
 
     std::string index_file_prefix;
     CLI::Option* index_file_prefix_opt = nullptr;
@@ -84,7 +84,9 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
     opts.alt_pams    = {};
     opts.threshold   = 1;
     opts.mismatches  = 3;
+    opts.start       = false;
 
+    opts.start_opt       = build->add_flag("--start", opts.start, "Match PAM at start of kmer instead at end (default).");
     opts.nthreads_opt    = build->add_option("-n,--threads", opts.nthreads, "Number of threads to parallelize over", true);
     opts.alt_pams_opt    = build->add_option("-a,--alt-pam", opts.alt_pams, "Alternative PAMs used to find off-targets", true);
     opts.mismatches_opt  = build->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
@@ -253,9 +255,10 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
     for (size_t i = 0; i < opts.nthreads; i++) {
         thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
                  cref(gi_forward), cref(gi_reverse),
-                 cref(pams), opts.mismatches, opts.threshold,
-		 ref(kmer_p), ref(kmer_mtx),
-		 ref(output), ref(output_mtx));
+                 cref(pams), opts.mismatches,
+                 opts.threshold, opts.start,
+                 ref(kmer_p), ref(kmer_mtx),
+                 ref(output), ref(output_mtx));
         threads.push_back(move(t));
     }
 

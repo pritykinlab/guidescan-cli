@@ -162,7 +162,9 @@ def output_succinct(record, offtargets):
     match_counts = [0, 0, 0, 0]
     cfd_sum = None
     if offtargets:
-        cfd_sum = sum((offtarget['cfd'] for offtarget in offtargets))
+        if all(offtarget['cfd'] is not None for offtarget in offtargets):
+            cfd_sum =  sum((offtarget['cfd'] for offtarget in offtargets))
+
         for offtarget in offtargets:
             match_counts[offtarget['distance']] += 1
 
@@ -197,11 +199,6 @@ def parse_args():
         help="Succinct or complete off-target information.",
         choices=['succinct', 'complete'],
         default='succinct'
-    )
-        
-    p.add_argument(
-        '--outfile',
-        default='out.csv'
     )
 
     return p.parse_args()
