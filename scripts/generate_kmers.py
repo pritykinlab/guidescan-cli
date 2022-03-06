@@ -90,6 +90,10 @@ def find_kmers(pam, k, chrm, forward=True, end=True):
                 position = index - k
 
         index += 1
+
+        if position < 0:
+            continue
+
         yield (kmer.upper(), position)
 
 def find_all_kmers(pam, k, chrm, end=True):
