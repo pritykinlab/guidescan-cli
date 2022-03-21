@@ -115,7 +115,6 @@ CLI::App* http_cmd(CLI::App &guidescan, http_server_cmd_options& opts) {
     opts.mismatches_opt = http->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
     opts.ot_limit_opt   = http->add_option("-l,--offtarget-limit", opts.ot_limit, "Max number of off-targets to enumerate", true);
     opts.index_file_prefix_opt = http->add_option("genome", opts.index_file_prefix, "Genome in FASTA format")
-        ->check(CLI::ExistingFile)
         ->required();
 
     return http;

@@ -89,6 +89,9 @@ def find_kmers(pam, k, chrm, forward=True, end=True):
                 kmer = chrm[index - k:index]
                 position = index - k
 
+        if position < 0:
+            continue
+
         index += 1
 
         if position < 0:
