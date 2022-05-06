@@ -21,12 +21,14 @@ def parse_arguments():
     parser.add_argument(
         "--kmer-length",
         help="Length of kmers to generate.",
+        type=int,
         default=20
     )
 
     parser.add_argument(
         "--min-chr-length",
         help="Minimum chromosome length to consider for kmer generation.",
+        type=int,
         default=10_000
     )
 
