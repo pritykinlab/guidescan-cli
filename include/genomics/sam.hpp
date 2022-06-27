@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <vector>
+#include <list>
 
 namespace genomics {
     namespace {
@@ -73,7 +74,7 @@ namespace genomics {
             return out;
         }
 
-        std::string vector_to_little_endian_hex(std::vector<uint64_t> v) {
+        std::string list_to_little_endian_hex(std::list<int64_t> v) {
             std::string out("");
             for (auto n : v) {
                 out += num_to_little_endian_hex(n);
@@ -90,17 +91,17 @@ namespace genomics {
         }
 
         std::string off_target_string(genome_structure gs,
-                                      const std::vector<std::vector<int64_t>>& off_targets) {
+                                      std::vector<std::list<int64_t>>& off_targets) {
             uint64_t delim = get_delim(gs);
-            std::vector<uint64_t> v;
+            std::string out("");
 
             for (uint64_t k = 0; k < off_targets.size(); k++) {
-                v.insert(v.end(), off_targets[k].begin(), off_targets[k].end());
-                v.push_back(k);
-                v.push_back(delim);
+                off_targets[k].push_back(k);
+                off_targets[k].push_back(delim);
+                out += list_to_little_endian_hex(off_targets[k]);
             }
 
-            return vector_to_little_endian_hex(v);
+            return out;
         }
     };
 
@@ -114,7 +115,7 @@ namespace genomics {
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
     std::string get_sam_line(genome_index<t_wt, t_dens, t_inv_dens> gi,
                              const kmer& k, bool start,
-                             const std::vector<std::vector<int64_t>>& off_targets) {
+                             std::vector<std::list<int64_t>>& off_targets) {
         std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
         std::string samline(k.id);
 
