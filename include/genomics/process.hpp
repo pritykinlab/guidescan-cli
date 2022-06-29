@@ -209,7 +209,7 @@ namespace genomics {
                                std::ostream& output, std::mutex& output_mtx) {
     for (auto &kmer : kmers) {
       process_kmer_to_stream(gi_forward, gi_reverse, pams, mismatches, threshold,
-                             start, kmer, output, output_mtx);
+        start, kmer, output, output_mtx);
     }
   }
 }

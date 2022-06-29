@@ -113,7 +113,7 @@ namespace genomics {
     }
 
     template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-    std::string get_sam_line(genome_index<t_wt, t_dens, t_inv_dens> gi,
+    std::string get_sam_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                              const kmer& k, bool start,
                              std::vector<std::list<int64_t>>& off_targets) {
         std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
