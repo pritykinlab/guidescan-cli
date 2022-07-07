@@ -204,7 +204,7 @@ def parse_args():
     return p.parse_args()
 
 SUCCINCT_HEADER = ('id,sequence,chromosome,position,sense,'
-                   'distance_1_matches,distance_2_matches,'
+                   'distance_0_matches,distance_1_matches,'
                    'distance_2_matches,distance_3_matches,'
                    'specificity')
 COMPLETE_HEADER = ('id,match_number,sequence,chromosome,position,sense,distance,cfd')
