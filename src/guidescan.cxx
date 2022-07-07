@@ -8,7 +8,7 @@
 #include "httplib.h"
 #include "CLI/CLI.hpp"
 #include "genomics/index.hpp"
-#include "genomics/sam.hpp"
+#include "genomics/printer.hpp"
 #include "genomics/seq_io.hpp"
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"

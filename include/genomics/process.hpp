@@ -8,7 +8,7 @@
 #include "json.hpp"
 #include "genomics/kmer.hpp"
 #include "genomics/sequences.hpp"
-#include "genomics/sam.hpp"
+#include "genomics/printer.hpp"
 
 namespace genomics {
   namespace {

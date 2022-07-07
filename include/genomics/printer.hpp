@@ -1,5 +1,5 @@
-#ifndef SAM_H
-#define SAM_H
+#ifndef PRINTER_H
+#define PRINTER_H
 
 #include "genomics/structures.hpp"
 #include "genomics/sequences.hpp"
@@ -150,4 +150,4 @@ namespace genomics {
     }
 };
 
-#endif /* SAM_H */
+#endif /* PRINTER_H */
