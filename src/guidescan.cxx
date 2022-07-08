@@ -248,7 +248,7 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   if (opts.out_format == "sam") {
     genomics::write_sam_header(output, gi_forward.gs);
   } else {
-    genomics::write_sam_header(output, gi_forward.gs);
+    genomics::write_csv_header(output);
   }
 
   cout << "Reading in kmers." << endl;

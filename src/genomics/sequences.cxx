@@ -23,7 +23,7 @@ namespace genomics {
 
     std::string complement(const std::string& kmer) {
         std::string s;
-        for (int64_t i = 0; i <= kmer.length(); i++) {
+        for (int64_t i = 0; i < kmer.length(); i++) {
             char c = kmer[i];
             s += complement(c);
         }
