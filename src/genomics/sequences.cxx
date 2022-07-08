@@ -21,6 +21,16 @@ namespace genomics {
         }
     }
 
+    std::string complement(const std::string& kmer) {
+        std::string s;
+        for (int64_t i = 0; i <= kmer.length(); i++) {
+            char c = kmer[i];
+            s += complement(c);
+        }
+
+        return s;
+    }
+
     std::string reverse_complement(const std::string& kmer) {
         std::string s;
         for (int64_t i = kmer.length() - 1; i >= 0; i--) {

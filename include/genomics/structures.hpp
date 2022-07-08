@@ -12,13 +12,13 @@ namespace genomics {
         std::string sequence;
         std::string pam;
         std::string chromosome;
-        size_t position;
+        uint64_t position;
         direction dir;
     };
 
     struct chromosome {
         std::string name;
-        size_t length;
+        uint64_t length;
 
         bool operator==(const chromosome& other) const {
             return name == other.name && length == other.length;
@@ -27,13 +27,13 @@ namespace genomics {
 
     struct coordinates {
         chromosome chr;
-        size_t offset;
+        uint64_t offset;
     };
 
     typedef std::vector<chromosome> genome_structure;
 
-    coordinates resolve_absolute(const genome_structure& gs, size_t absolute_coords);
-    size_t      resolve_relative(const genome_structure& gs, coordinates coords);
+    coordinates resolve_absolute(const genome_structure& gs, uint64_t absolute_coords);
+    uint64_t    resolve_relative(const genome_structure& gs, coordinates coords);
 };
 
 #endif /* GENOMIC_STRUCTURES_H */

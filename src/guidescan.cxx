@@ -33,6 +33,9 @@ struct enumerate_cmd_options {
   size_t mismatches;
   CLI::Option* mismatches_opt = nullptr;
     
+  std::string out_format;
+  CLI::Option* out_format_opt = nullptr;
+
   size_t nthreads;
   CLI::Option* nthreads_opt = nullptr;
 
@@ -85,12 +88,15 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.threshold   = 1;
   opts.mismatches  = 3;
   opts.start       = false;
+  opts.out_format  = "csv";
 
   opts.start_opt       = build->add_flag("--start", opts.start, "Match PAM at start of kmer instead at end (default).");
   opts.nthreads_opt    = build->add_option("-n,--threads", opts.nthreads, "Number of threads to parallelize over", true);
   opts.alt_pams_opt    = build->add_option("-a,--alt-pam", opts.alt_pams, "Alternative PAMs used to find off-targets", true);
   opts.mismatches_opt  = build->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
   opts.threshold_opt   = build->add_option("-t,--threshold", opts.threshold, "Filters gRNAs with off-targets at a distance at or below this threshold", true);
+  opts.out_format_opt  = build->add_option("--format", opts.out_format, "File format for output. Choices are ['csv', 'sam'].")
+    ->transform(CLI::IsMember({"csv", "sam"}, CLI::ignore_case));
   opts.kmers_file_opt  = build->add_option("-f,--kmers-file", opts.kmers_file,
                                            "File containing kmers to build gRNA database"
                                            " over, if not specified, will generate the database over all kmers with the given PAM")
@@ -98,7 +104,7 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
     ->required();
   opts.index_file_prefix_opt  = build->add_option("index", opts.index_file_prefix, "Prefix for index files")
     ->required();
-  opts.database_file_opt = build->add_option("-o, --output", opts.database_file, "Output database file.")
+  opts.database_file_opt = build->add_option("-o, --output", opts.database_file, "Output file.")
     ->required();
   
   return build;
@@ -239,10 +245,15 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   cout << "Successfully loaded indices." << endl;
 
   ofstream output(opts.database_file);
-  genomics::write_sam_header(output, gi_forward.gs);
+  if (opts.out_format == "sam") {
+    genomics::write_sam_header(output, gi_forward.gs);
+  } else {
+    genomics::write_sam_header(output, gi_forward.gs);
+  }
 
   cout << "Reading in kmers." << endl;
   genomics::kmers_file_producer kmer_p(opts.kmers_file);
+
 
   // split kmers across threads.
   vector<vector<genomics::kmer>> kmers(opts.nthreads, vector<genomics::kmer>());
@@ -259,7 +270,7 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
     thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
              cref(gi_forward), cref(gi_reverse),
              cref(pams), opts.mismatches,
-             opts.threshold, opts.start,
+             opts.threshold, opts.start, opts.out_format,
              cref(kmers[i]), ref(output), ref(output_mtx));
     threads.push_back(move(t));
   }
