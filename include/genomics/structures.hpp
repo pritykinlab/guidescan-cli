@@ -30,6 +30,18 @@ namespace genomics {
         uint64_t offset;
     };
 
+    struct match {
+        std::string sequence;
+        uint64_t sp, ep;
+        uint64_t mismatches;
+        uint64_t dna_bulges;
+        uint64_t rna_bulges;
+
+        bool operator<(const match& other) const {
+            return sequence < other.sequence;
+        } 
+    };
+
     typedef std::vector<chromosome> genome_structure;
 
     coordinates resolve_absolute(const genome_structure& gs, uint64_t absolute_coords);

@@ -9,23 +9,21 @@
 #include "genomics/kmer.hpp"
 #include "genomics/sequences.hpp"
 #include "genomics/printer.hpp"
+#include "genomics/structures.hpp"
 
 namespace genomics {
   namespace {
-    void off_target_enumerator(size_t sp, size_t ep, size_t k, std::string match,
-                               std::vector<std::set<std::tuple<size_t, size_t, std::string>>> &off_targets_bwt) {
-      off_targets_bwt[k].insert(std::make_tuple(sp, ep, match));
+    void off_target_enumerator(match m, std::vector<std::set<match>> &off_targets_bwt) {
+      off_targets_bwt[m.mismatches].insert(m);
     }
 
-    std::function<void(size_t, size_t, size_t, std::string, std::vector<std::set<std::tuple<size_t, size_t, std::string>>>&)> callback = off_target_enumerator;
+    std::function<void(match, std::vector<std::set<match>>&)> callback = off_target_enumerator;
 
-    void off_target_counter(size_t sp, size_t ep, size_t k, std::string match, size_t &count) {
-      (void) k;
-      (void) match;
-      count += ep - sp + 1;
+    void off_target_counter(match m, size_t &count) {
+      count += m.ep - m.sp + 1;
     }
 
-    std::function<void(size_t, size_t, size_t, std::string, size_t&)> counting_callback = off_target_counter;
+    std::function<void(match, size_t&)> counting_callback = off_target_counter;
   };
 
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
@@ -70,8 +68,8 @@ namespace genomics {
       if (count > 1) return;
     }
 
-    std::vector<std::set<std::tuple<size_t, size_t, std::string>>> forward_off_targets_bwt(mismatches + 1);
-    std::vector<std::set<std::tuple<size_t, size_t, std::string>>> reverse_off_targets_bwt(mismatches + 1);
+    std::vector<std::set<match>> forward_off_targets_bwt(mismatches + 1);
+    std::vector<std::set<match>> reverse_off_targets_bwt(mismatches + 1);
 
     if (!start) {
       gi_forward.inexact_search(kmer, pams_c, mismatches, callback, forward_off_targets_bwt);
@@ -92,27 +90,19 @@ namespace genomics {
      * that they can be distinguished.
      */
 
-    std::vector<std::list<std::tuple<int64_t, std::string>>> off_targets(mismatches + 1);
+    std::vector<std::list<std::tuple<int64_t, match>>> off_targets(mismatches + 1);
     for (size_t i = 0; i < mismatches + 1; i++) {
-      for (const auto& sp_ep : forward_off_targets_bwt[i]) {
-        size_t sp = std::get<0>(sp_ep);
-        size_t ep = std::get<1>(sp_ep);
-        std::string match = std::get<2>(sp_ep);
-
-        for (size_t j = sp; j <= ep; j++) {
+      for (const auto& m : forward_off_targets_bwt[i]) {
+        for (size_t j = m.sp; j <= m.ep; j++) {
           int64_t absolute_pos = -gi_forward.resolve(j);
-          off_targets[i].push_back(std::make_tuple(absolute_pos, match));
+          off_targets[i].push_back(std::make_tuple(absolute_pos, m));
         }
       }
 
-      for (const auto& sp_ep : reverse_off_targets_bwt[i]) {
-        size_t sp = std::get<0>(sp_ep);
-        size_t ep = std::get<1>(sp_ep);
-        std::string match = std::get<2>(sp_ep);
-
-        for (size_t j = sp; j <= ep; j++) {
+      for (const auto& m : reverse_off_targets_bwt[i]) {
+        for (size_t j = m.sp; j <= m.ep; j++) {
           int64_t absolute_pos = genome_length - (gi_reverse.resolve(j) + 1);
-          off_targets[i].push_back(std::make_tuple(absolute_pos, match));
+          off_targets[i].push_back(std::make_tuple(absolute_pos, m));
         }
       }
     }
@@ -128,72 +118,6 @@ namespace genomics {
       output << sam_line << std::endl;
       output_mtx.unlock();
     }
-  }
-
-
-  template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-  nlohmann::json search_kmer(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
-                             const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
-                             std::string kmer, size_t mismatches, int offtarget_lim) {
-    using json = nlohmann::json;
-    std::vector<std::set<std::tuple<size_t, size_t, std::string>>> forward_matches(mismatches + 1);
-    std::vector<std::set<std::tuple<size_t, size_t, std::string>>> reverse_matches(mismatches + 1);
-
-    gi_forward.inexact_search(kmer.begin(), kmer.end(), mismatches, callback, forward_matches);
-    gi_reverse.inexact_search(kmer.begin(), kmer.end(), mismatches, callback, reverse_matches);
-
-    size_t genome_length = 0;
-    for (size_t i = 0; i < gi_forward.gs.size(); i++) {
-      genome_length += gi_forward.gs[i].length;
-    }
-
-    json matches;
-    int matches_enumerated = 0;
-    for (size_t i = 0; i < mismatches + 1; i++) {
-      for (const auto& sp_ep : forward_matches[i]) {
-        size_t sp = std::get<0>(sp_ep);
-        size_t ep = std::get<1>(sp_ep);
-        for (size_t j = sp; j <= ep; j++) {
-          if (offtarget_lim > 0 && matches_enumerated >= offtarget_lim) return matches;
-
-          size_t absolute_pos = gi_forward.resolve(j);
-          coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
-          json match = {
-            {"chr", pos.chr.name},
-            {"pos", pos.offset},
-            {"absolute_pos", absolute_pos},
-            {"strand", "+"},
-            {"distance", i}
-          };
-
-          matches_enumerated++;
-          matches.push_back(match);
-        }
-      }
-
-      for (const auto& sp_ep : reverse_matches[i]) {
-        size_t sp = std::get<0>(sp_ep);
-        size_t ep = std::get<1>(sp_ep);
-        for (size_t j = sp; j <= ep; j++) {
-          if (offtarget_lim > 0 && matches_enumerated >= offtarget_lim) return matches;
-
-          size_t absolute_pos = genome_length - (gi_reverse.resolve(j) + 1);
-          coordinates pos = resolve_absolute(gi_forward.gs, absolute_pos);
-          json match = {
-            {"chr", pos.chr.name},
-            {"absolute_pos", absolute_pos},
-            {"pos", pos.offset},
-            {"strand", "-"},
-            {"distance", i}
-          };
-
-          matches_enumerated++;
-          matches.push_back(match);
-        }
-      }
-    }
-
-    return matches;
   }
 
   /* Processes the kmers in the file, collecting all information

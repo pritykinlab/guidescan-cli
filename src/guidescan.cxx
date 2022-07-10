@@ -5,7 +5,6 @@
 #include <sdsl/suffix_arrays.hpp>
 
 #include "json.hpp"
-#include "httplib.h"
 #include "CLI/CLI.hpp"
 #include "genomics/index.hpp"
 #include "genomics/printer.hpp"
@@ -55,20 +54,6 @@ struct enumerate_cmd_options {
   CLI::Option* alt_pams_opt = nullptr;
 };
 
-struct http_server_cmd_options {
-  std::string index_file_prefix;
-  CLI::Option* index_file_prefix_opt = nullptr;
-
-  size_t mismatches;
-  CLI::Option* mismatches_opt = nullptr;
-
-  int ot_limit;
-  CLI::Option* ot_limit_opt = nullptr;
-
-  size_t port;
-  CLI::Option* port_opt = nullptr;
-};
-
 CLI::App* index_cmd(CLI::App &guidescan, index_cmd_options& opts) {
   auto build  = guidescan.add_subcommand("index", "Builds an genomic index over a FASTA file.");
 
@@ -108,22 +93,6 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
     ->required();
   
   return build;
-}
-
-CLI::App* http_cmd(CLI::App &guidescan, http_server_cmd_options& opts) {
-  auto http = guidescan.add_subcommand("http-server",
-                                       "Starts a local HTTP server to receive gRNA processing requests.");
-  opts.mismatches  = 3;
-  opts.port = 4500;
-  opts.ot_limit = -1;
-
-  opts.port_opt       = http->add_option("--port", opts.port, "HTTP Server Port", true);
-  opts.mismatches_opt = http->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
-  opts.ot_limit_opt   = http->add_option("-l,--offtarget-limit", opts.ot_limit, "Max number of off-targets to enumerate", true);
-  opts.index_file_prefix_opt = http->add_option("genome", opts.index_file_prefix, "Genome in FASTA format")
-    ->required();
-
-  return http;
 }
 
 template<typename T, typename... Args>
@@ -282,60 +251,6 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   return 0;
 }
 
-int do_http_server_cmd(const http_server_cmd_options& opts) {
-  using namespace std;
-  using json = nlohmann::json;
-
-  string forward_fm_index_file = opts.index_file_prefix + ".forward";
-  string reverse_fm_index_file = opts.index_file_prefix + ".reverse";
-  string genome_structure_file = opts.index_file_prefix + ".gs";
-
-  cout << "Loading genome index..." << endl;
-
-  genomics::genome_structure gs;
-  if (!genomics::seq_io::load_from_file(gs, genome_structure_file)) {
-    cerr << "No genome structure file \"" << genome_structure_file
-         << "\" located. Abort." << endl;
-    return 1;
-  }
-
-  sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> forward_fm_index;
-  if (!load_from_file(forward_fm_index, forward_fm_index_file)) {
-    cerr << "No forward index file \"" << forward_fm_index_file
-         << "\" located. Abort." << endl;
-    return 1;
-  }   
-
-  sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> reverse_fm_index;
-  if (!load_from_file(reverse_fm_index, reverse_fm_index_file)) {
-    cerr << "No reverse index file \"" << reverse_fm_index_file
-         << "\" located. Abort." << endl;
-    return 1;
-  }   
-
-  genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_forward(forward_fm_index, gs);
-  genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_reverse(reverse_fm_index, gs);
-  cout << "Successfully loaded indices." << endl;
-
-  httplib::Server svr;
-  svr.Get("/search", [&gi_forward, &gi_reverse, &opts](const httplib::Request& req, httplib::Response& res){
-    if (!req.has_param("sequence")) {
-      return;
-    }
-
-    auto sequence = req.get_param_value("sequence");
-    if (sequence.length() == 0) return;
-
-    json result = search_kmer(gi_forward, gi_reverse, sequence, opts.mismatches, opts.ot_limit);
-    res.set_content(result.dump(), "application/json");
-  });
-
-  cout << "Successfully started local server." << endl;
-  svr.listen("localhost", opts.port);
-        
-  return 0;
-}
-
 int main(int argc, char *argv[])
 {
   CLI::App guidescan("Guidescan all-in-one interface.\n");
@@ -344,13 +259,11 @@ int main(int argc, char *argv[])
 
   enumerate_cmd_options enumerate_opts;
   index_cmd_options index_opts;
-  http_server_cmd_options http_opts;
 
   auto enumerate = enumerate_cmd(guidescan, enumerate_opts);
   auto index = index_cmd(guidescan, index_opts);
-  auto http  = http_cmd(guidescan, http_opts);
 
-  (void) enumerate; (void) index; (void) http; // supress unused variable warnings
+  (void) enumerate; (void) index;; // supress unused variable warnings
 
   try {
     guidescan.parse(argc, argv);
@@ -364,10 +277,6 @@ int main(int argc, char *argv[])
 
   if (guidescan.got_subcommand("enumerate")) {
     return do_enumerate_cmd(enumerate_opts);
-  }
-
-  if (guidescan.got_subcommand("http-server")) {
-    return do_http_server_cmd(http_opts);
   }
 
   return 1;

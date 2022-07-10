@@ -14,6 +14,8 @@ namespace genomics {
     }
 
     assert(0 && "Absolute coords longer than genome.");
+
+    return *((coordinates *) ((void *) nullptr)); // to suppress warning
   }
 
 

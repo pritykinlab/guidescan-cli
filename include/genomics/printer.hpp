@@ -75,10 +75,9 @@ namespace genomics {
       return out;
     }
 
-    std::string list_to_little_endian_hex(std::list<std::tuple<int64_t, std::string>> v) {
+    std::string list_to_little_endian_hex(std::list<int64_t> v) {
       std::string out("");
-      for (const auto& t : v) {
-        uint64_t n = std::get<0>(t);
+      for (const auto& n : v) {
         out += num_to_little_endian_hex(n);
       }
       return out;
@@ -93,14 +92,21 @@ namespace genomics {
     }
 
     std::string off_target_string(genome_structure gs,
-                                  std::vector<std::list<std::tuple<int64_t, std::string>>>& off_targets) {
+                                  std::vector<std::list<std::tuple<int64_t, match>>>& off_targets) {
       uint64_t delim = get_delim(gs);
       std::string out("");
 
       for (uint64_t k = 0; k < off_targets.size(); k++) {
-        off_targets[k].push_back(std::make_tuple(k, ""));
-        off_targets[k].push_back(std::make_tuple(delim, ""));
-        out += list_to_little_endian_hex(off_targets[k]);
+          std::list<int64_t> v;
+
+          for (const auto& t : off_targets[k]) {
+              v.push_back(std::get<0>(t));
+          }
+
+          v.push_back(k);
+          v.push_back(delim);
+          
+          out += list_to_little_endian_hex(v);
       }
 
       return out;
@@ -157,14 +163,14 @@ namespace genomics {
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_csv_lines(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                             const kmer& k, bool start,
-                            std::vector<std::list<std::tuple<int64_t, std::string>>>& off_targets) {
+                            std::vector<std::list<std::tuple<int64_t, match>>>& off_targets) {
     std::string csvlines;
 
     for (uint64_t d = 0; d < off_targets.size(); d++) {
       for (const auto& off_target : off_targets[d]) {
         int64_t off_target_abs_coords = std::get<0>(off_target);
-        std::string match = std::get<1>(off_target);
-        csvlines += get_csv_line(gi, k, start, d, match, off_target_abs_coords);
+        match match = std::get<1>(off_target);
+        csvlines += get_csv_line(gi, k, start, d, match.sequence, off_target_abs_coords);
         csvlines += "\n";
       }
     }
@@ -175,7 +181,7 @@ namespace genomics {
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_sam_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                            const kmer& k, bool start,
-                           std::vector<std::list<std::tuple<int64_t, std::string>>>& off_targets) {
+                           std::vector<std::list<std::tuple<int64_t, match>>>& off_targets) {
     std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
     std::string samline(k.id);
 

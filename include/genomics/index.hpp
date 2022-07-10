@@ -7,12 +7,23 @@
 #include <vector>
 
 namespace genomics {
+  namespace {
+      enum class bulge_state {none, dna, rna};
+
+      struct affinity {
+          uint64_t mismatches;
+          uint64_t dna_bulges;
+          uint64_t rna_bulges;
+          bulge_state state;
+          uint64_t curr_bulge_size;
+      };
+  }
 
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   class genome_index {
   public:
     typedef sdsl::csa_wt<t_wt, t_dens, t_inv_dens> t_csa;
-
+      
     t_csa csa;
     genome_structure gs;
 
@@ -79,15 +90,15 @@ namespace genomics {
                         size_t sp, size_t ep,
                         std::string match,
                         const std::vector<std::string> &pams,
-                        size_t mismatches, size_t k,
-                        const std::function<void(size_t, size_t, size_t, std::string, t_data&)> &callback,
+                        size_t mismatches, affinity aff,
+                        const std::function<void(struct match, t_data&)> &callback,
                         t_data& data) const;
 
     template <class t_data>
     void inexact_search(const std::string& query,
                         const std::vector<std::string> &pams,
                         size_t mismatches, 
-                        const std::function<void(size_t, size_t, size_t, std::string, t_data&)> &callback,
+                        const std::function<void(struct match, t_data&)> &callback,
                         t_data& data) const;
   };
 
@@ -154,22 +165,26 @@ namespace genomics {
   void genome_index<t_wt, t_dens, t_inv_dens>::inexact_search(const std::string& query,
                                                               ssize_t position,
                                                               size_t sp, size_t ep,
-                                                              std::string match,
+                                                              std::string sequence,
                                                               const std::vector<std::string> &pams,
                                                               size_t mismatches, 
-                                                              size_t k, 
-                                                              const std::function<void(size_t, size_t, size_t, std::string, t_data&)> &callback,
+                                                              affinity aff, 
+                                                              const std::function<void(struct match, t_data&)> &callback,
                                                               t_data& data) const {
     if (position < 0) {
-
       std::function<void(size_t, size_t, size_t, std::string, t_data&)> matching_callback =
-        [k, callback](size_t sp, size_t ep, size_t mismatches, std::string match, t_data& data) {
+        [aff, callback](size_t sp, size_t ep, size_t mismatches, std::string sequence, t_data& data) {
           (void) mismatches;
-          return callback(sp, ep, k, match, data);
-        } ;
+
+          match m = {
+              sequence, sp, ep, aff.mismatches, aff.dna_bulges, aff.rna_bulges
+          };
+
+          return callback(m, data);
+      };
 
       for (const auto& pam : pams) {
-        inexact_search(pam.begin(), pam.end(), sp, ep, match, 0, 0, matching_callback, data);
+        inexact_search(pam.begin(), pam.end(), sp, ep, sequence, 0, 0, matching_callback, data);
       }
 
       return;
@@ -183,12 +198,12 @@ namespace genomics {
     if (occ_within > 0) {
       size_t sp_prime = csa.C[csa.char2comp[c]] + occ_before;
       size_t ep_prime = sp_prime + occ_within - 1;
-      inexact_search(query, position - 1, sp_prime, ep_prime, match + c, pams,
-                     mismatches, k, callback, data);
+      inexact_search(query, position - 1, sp_prime, ep_prime, sequence + c, pams,
+                     mismatches, aff, callback, data);
     }
 
     size_t cost = 1;
-    if (k >= mismatches) return;
+    if (aff.mismatches >= mismatches) return;
 
     for (size_t i = 0; i < search_alphabet_size; i++) {
       if (search_alphabet[i] == c) continue;
@@ -201,8 +216,10 @@ namespace genomics {
       if (occ_within > 0) {
         size_t sp_prime = csa.C[csa.char2comp[a]] + occ_before;
         size_t ep_prime = sp_prime + occ_within - 1;
-        inexact_search(query, position - 1, sp_prime, ep_prime, match + a, pams,
-                       mismatches, k + cost, callback, data);
+        affinity aff_cost = aff;
+        aff_cost.mismatches += cost;
+        inexact_search(query, position - 1, sp_prime, ep_prime, sequence + a, pams,
+                       mismatches, aff_cost, callback, data);
       }
     }
   }
@@ -212,10 +229,11 @@ namespace genomics {
   void genome_index<t_wt, t_dens, t_inv_dens>::inexact_search(const std::string& query,
                                                               const std::vector<std::string> &pams,
                                                               size_t mismatches, 
-                                                              const std::function<void(size_t, size_t, size_t, std::string, t_data&)> &callback,
+                                                              const std::function<void(struct match, t_data&)> &callback,
                                                               t_data& data) const {
+    affinity aff = {0, 0, 0, bulge_state::none, 0};
     inexact_search(query, query.length() - 1, 0, csa.size() - 1, "",
-                   pams, mismatches, 0, callback, data);
+                   pams, mismatches, aff, callback, data);
   }
 
 };
