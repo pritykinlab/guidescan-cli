@@ -10,6 +10,7 @@
 #include "genomics/sequences.hpp"
 #include "genomics/printer.hpp"
 #include "genomics/structures.hpp"
+#include "guidescan.hpp"
 
 namespace genomics {
   namespace {
@@ -29,8 +30,7 @@ namespace genomics {
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   void process_kmer_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
                               const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
-                              std::vector<std::string> pams, size_t mismatches,
-                              int threshold, bool start, std::string out_format,
+                              const enumerate_cmd_options& opts,
                               const kmer& k,
                               std::ostream& output,
                               std::mutex& output_mtx) {
@@ -43,6 +43,7 @@ namespace genomics {
      * of the kmer on the forward strand.
      */
         
+    std::vector<std::string> pams = opts.alt_pams;
     if (k.pam == "") {
       pams = {std::string("")};
     } else {
@@ -54,29 +55,30 @@ namespace genomics {
       pams_c.push_back(genomics::reverse_complement(pam));
     }
         
-    std::string kmer = !start ? genomics::reverse_complement(k.sequence) : k.sequence;
+    std::string kmer = !opts.start ? genomics::reverse_complement(k.sequence) : k.sequence;
 
-    if (threshold > 0 && !start) {
-      gi_forward.inexact_search(kmer, pams_c, threshold, counting_callback, count);
+    // for this threshold search we need to not do bulges...
+    if (opts.threshold > 0 && !opts.start) {
+      gi_forward.inexact_search(kmer, pams_c, opts.threshold, 0, 0, 0, counting_callback, count);
       if (count > 1) return;
-      gi_reverse.inexact_search(kmer, pams_c, threshold, counting_callback, count);
+      gi_reverse.inexact_search(kmer, pams_c, opts.threshold, 0, 0, 0, counting_callback, count);
       if (count > 1) return;
-    } else if (threshold > 0 && start) {
-      gi_forward.inexact_search(kmer, pams, threshold, counting_callback, count);
+    } else if (opts.threshold > 0 && opts.start) {
+      gi_forward.inexact_search(kmer, pams, opts.threshold, 0, 0, 0, counting_callback, count);
       if (count > 1) return;
-      gi_reverse.inexact_search(kmer, pams, threshold, counting_callback, count);
+      gi_reverse.inexact_search(kmer, pams, opts.threshold, 0, 0, 0, counting_callback, count);
       if (count > 1) return;
     }
 
-    std::vector<std::set<match>> forward_off_targets_bwt(mismatches + 1);
-    std::vector<std::set<match>> reverse_off_targets_bwt(mismatches + 1);
+    std::vector<std::set<match>> forward_off_targets_bwt(opts.mismatches + 1);
+    std::vector<std::set<match>> reverse_off_targets_bwt(opts.mismatches + 1);
 
-    if (!start) {
-      gi_forward.inexact_search(kmer, pams_c, mismatches, callback, forward_off_targets_bwt);
-      gi_reverse.inexact_search(kmer, pams_c, mismatches, callback, reverse_off_targets_bwt);
+    if (!opts.start) {
+        gi_forward.inexact_search(kmer, pams_c, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, forward_off_targets_bwt);
+        gi_reverse.inexact_search(kmer, pams_c, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, reverse_off_targets_bwt);
     } else {
-      gi_forward.inexact_search(kmer, pams, mismatches, callback, forward_off_targets_bwt);
-      gi_reverse.inexact_search(kmer, pams, mismatches, callback, reverse_off_targets_bwt);
+        gi_forward.inexact_search(kmer, pams, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, forward_off_targets_bwt);
+        gi_reverse.inexact_search(kmer, pams, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, reverse_off_targets_bwt);
     }
 
     size_t genome_length = 0;
@@ -90,8 +92,8 @@ namespace genomics {
      * that they can be distinguished.
      */
 
-    std::vector<std::list<std::tuple<int64_t, match>>> off_targets(mismatches + 1);
-    for (size_t i = 0; i < mismatches + 1; i++) {
+    std::vector<std::list<std::tuple<int64_t, match>>> off_targets(opts.mismatches + 1);
+    for (size_t i = 0; i < opts.mismatches + 1; i++) {
       for (const auto& m : forward_off_targets_bwt[i]) {
         for (size_t j = m.sp; j <= m.ep; j++) {
           int64_t absolute_pos = -gi_forward.resolve(j);
@@ -107,13 +109,13 @@ namespace genomics {
       }
     }
 
-    if (out_format == "csv") {
-      std::string csv_lines = genomics::get_csv_lines(gi_forward, k, start, off_targets);
+    if (opts.out_format == "csv") {
+      std::string csv_lines = genomics::get_csv_lines(gi_forward, k, opts.start, off_targets);
       output_mtx.lock();
       output << csv_lines;
       output_mtx.unlock();
     } else {
-      std::string sam_line = genomics::get_sam_line(gi_forward, k, start, off_targets);
+      std::string sam_line = genomics::get_sam_line(gi_forward, k, opts.start, off_targets);
       output_mtx.lock();
       output << sam_line << std::endl;
       output_mtx.unlock();
@@ -125,14 +127,11 @@ namespace genomics {
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   void process_kmers_to_stream(const genome_index<t_wt, t_dens, t_inv_dens>& gi_forward,
                                const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
-                               const std::vector<std::string> &pams,
-                               size_t mismatches, int threshold, bool start,
-                               std::string out_format,
-                               const std::vector<kmer> &kmers,
+                               const enumerate_cmd_options& opts,
+                               const std::vector<kmer>& kmers,
                                std::ostream& output, std::mutex& output_mtx) {
     for (auto &kmer : kmers) {
-      process_kmer_to_stream(gi_forward, gi_reverse, pams, mismatches, threshold,
-                             start, out_format, kmer, output, output_mtx);
+        process_kmer_to_stream(gi_forward, gi_reverse, opts, kmer, output, output_mtx);
     }
   }
 }

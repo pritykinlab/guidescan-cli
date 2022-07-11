@@ -121,13 +121,12 @@ namespace genomics {
   }
 
   void write_csv_header(std::ostream& os) {
-    os << "id,sequence,match_chrm,match_position,match_strand,match_sequence,match_distance" << std::endl;
+    os << "id,sequence,match_chrm,match_position,match_strand,match_sequence,match_distance,rna_bulges,dna_bulges" << std::endl;
   }
 
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_csv_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
-                           const kmer& k, bool start, uint64_t distance,
-                           const std::string& match,
+                           const kmer& k, bool start, match m,
                            int64_t off_target_abs_coords) {
     std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
     std::string csvline(k.id);
@@ -152,10 +151,16 @@ namespace genomics {
     csvline += strand;
 
     csvline += ",";
-    csvline += complement(match);
+    csvline += complement(m.sequence);
 
     csvline += ",";
-    csvline += std::to_string(distance);
+    csvline += std::to_string(m.mismatches);
+
+    csvline += ",";
+    csvline += std::to_string(m.rna_bulges);
+
+    csvline += ",";
+    csvline += std::to_string(m.dna_bulges);
 
     return csvline;
   }
@@ -170,7 +175,7 @@ namespace genomics {
       for (const auto& off_target : off_targets[d]) {
         int64_t off_target_abs_coords = std::get<0>(off_target);
         match match = std::get<1>(off_target);
-        csvlines += get_csv_line(gi, k, start, d, match.sequence, off_target_abs_coords);
+        csvlines += get_csv_line(gi, k, start, match, off_target_abs_coords);
         csvlines += "\n";
       }
     }

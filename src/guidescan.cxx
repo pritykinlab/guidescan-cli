@@ -5,55 +5,17 @@
 #include <sdsl/suffix_arrays.hpp>
 
 #include "json.hpp"
-#include "CLI/CLI.hpp"
 #include "genomics/index.hpp"
 #include "genomics/printer.hpp"
 #include "genomics/seq_io.hpp"
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"
+#include "guidescan.hpp"
 
 #define t_sa_dens 64
 #define t_isa_dens 8192
 
 typedef sdsl::wt_huff<> t_wt;
-
-struct index_cmd_options {
-  std::string fasta_file;
-  CLI::Option* fasta_file_opt = nullptr;
-
-  std::string index_file_prefix;
-  CLI::Option* index_file_prefix_opt = nullptr;
-};
-
-struct enumerate_cmd_options {
-  int threshold;
-  CLI::Option* threshold_opt = nullptr;
-
-  size_t mismatches;
-  CLI::Option* mismatches_opt = nullptr;
-    
-  std::string out_format;
-  CLI::Option* out_format_opt = nullptr;
-
-  size_t nthreads;
-  CLI::Option* nthreads_opt = nullptr;
-
-  bool start;
-  CLI::Option* start_opt = nullptr;
-
-  std::string index_file_prefix;
-  CLI::Option* index_file_prefix_opt = nullptr;
-
-  std::string database_file;
-  CLI::Option* database_file_opt = nullptr;
-
-  std::string kmers_file;
-  CLI::Option* kmers_file_opt = nullptr;
-
-  std::vector<std::string> alt_pams;
-  CLI::Option* alt_pams_opt = nullptr;
-};
-
 CLI::App* index_cmd(CLI::App &guidescan, index_cmd_options& opts) {
   auto build  = guidescan.add_subcommand("index", "Builds an genomic index over a FASTA file.");
 
@@ -72,6 +34,8 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.alt_pams    = {};
   opts.threshold   = 1;
   opts.mismatches  = 3;
+  opts.rna_bulges  = 0;
+  opts.dna_bulges  = 0;
   opts.start       = false;
   opts.out_format  = "csv";
 
@@ -79,6 +43,8 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.nthreads_opt    = build->add_option("-n,--threads", opts.nthreads, "Number of threads to parallelize over", true);
   opts.alt_pams_opt    = build->add_option("-a,--alt-pam", opts.alt_pams, "Alternative PAMs used to find off-targets", true);
   opts.mismatches_opt  = build->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
+  opts.mismatches_opt  = build->add_option("--rna-bulges", opts.rna_bulges, "Max number of RNA bulges to allow when finding off-targets", true);
+  opts.mismatches_opt  = build->add_option("--dna-bulges", opts.dna_bulges, "Number of DNA bulges to allow when finding off-targets", true);
   opts.threshold_opt   = build->add_option("-t,--threshold", opts.threshold, "Filters gRNAs with off-targets at a distance at or below this threshold", true);
   opts.out_format_opt  = build->add_option("--format", opts.out_format, "File format for output. Choices are ['csv', 'sam'].")
     ->transform(CLI::IsMember({"csv", "sam"}, CLI::ignore_case));
@@ -238,9 +204,8 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   for (size_t i = 0; i < opts.nthreads; i++) {
     thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
              cref(gi_forward), cref(gi_reverse),
-             cref(pams), opts.mismatches,
-             opts.threshold, opts.start, opts.out_format,
-             cref(kmers[i]), ref(output), ref(output_mtx));
+             cref(opts), cref(kmers[i]),
+             ref(output), ref(output_mtx));
     threads.push_back(move(t));
   }
 
