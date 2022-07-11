@@ -17,6 +17,10 @@ namespace genomics {
         case 'T': return 'A';
         case 'C': return 'G';
         case 'G': return 'C';
+        case 'a': return 't';
+        case 't': return 'a';
+        case 'c': return 'g';
+        case 'g': return 'c';
         default: return c;
         }
     }

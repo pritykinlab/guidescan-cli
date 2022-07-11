@@ -74,11 +74,11 @@ namespace genomics {
     std::vector<std::set<match>> reverse_off_targets_bwt(opts.mismatches + 1);
 
     if (!opts.start) {
-        gi_forward.inexact_search(kmer, pams_c, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, forward_off_targets_bwt);
-        gi_reverse.inexact_search(kmer, pams_c, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, reverse_off_targets_bwt);
+      gi_forward.inexact_search(kmer, pams_c, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, forward_off_targets_bwt);
+      gi_reverse.inexact_search(kmer, pams_c, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, reverse_off_targets_bwt);
     } else {
-        gi_forward.inexact_search(kmer, pams, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, forward_off_targets_bwt);
-        gi_reverse.inexact_search(kmer, pams, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, reverse_off_targets_bwt);
+      gi_forward.inexact_search(kmer, pams, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, forward_off_targets_bwt);
+      gi_reverse.inexact_search(kmer, pams, opts.mismatches, opts.rna_bulges, opts.dna_bulges, 1, callback, reverse_off_targets_bwt);
     }
 
     size_t genome_length = 0;
@@ -131,7 +131,7 @@ namespace genomics {
                                const std::vector<kmer>& kmers,
                                std::ostream& output, std::mutex& output_mtx) {
     for (auto &kmer : kmers) {
-        process_kmer_to_stream(gi_forward, gi_reverse, opts, kmer, output, output_mtx);
+      process_kmer_to_stream(gi_forward, gi_reverse, opts, kmer, output, output_mtx);
     }
   }
 }
