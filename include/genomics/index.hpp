@@ -318,11 +318,11 @@ namespace genomics {
 
     affinity rna_bulge_aff = aff;
     if (max_rna_bulges > aff.rna_bulges) {
-      if (aff.state != bulge_state::rna) {
+      if (aff.state != bulge_state::rna || rna_bulge_aff.curr_bulge_size == max_bulge_size) {
         rna_bulge_aff.state = bulge_state::rna;
         rna_bulge_aff.curr_bulge_size = 0;
         rna_bulge_aff.rna_bulges += 1;
-      }
+      } 
     }
 
     if (rna_bulge_aff.state == bulge_state::rna && rna_bulge_aff.curr_bulge_size < max_bulge_size) {
