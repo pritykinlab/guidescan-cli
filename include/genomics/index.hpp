@@ -374,7 +374,7 @@ namespace genomics {
                                                               const std::function<void(struct match, t_data&)> &callback,
                                                               t_data& data) const {
     // performance optimization
-    if (false && max_rna_bulges == 0 && max_dna_bulges == 0) {
+    if (max_rna_bulges == 0 && max_dna_bulges == 0) {
       inexact_search(query, query.length() - 1, 0, csa.size() - 1, "",
                      pams, mismatches, 0, callback, data);
       return;
