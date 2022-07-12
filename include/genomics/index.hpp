@@ -261,6 +261,39 @@ namespace genomics {
                                                               affinity aff, 
                                                               const std::function<void(struct match, t_data&)> &callback,
                                                               t_data& data) const {
+
+    affinity dna_bulge_aff = aff;
+    if (max_dna_bulges > aff.dna_bulges) {
+      if (aff.state != bulge_state::dna || dna_bulge_aff.curr_bulge_size == max_bulge_size) {
+        dna_bulge_aff.state = bulge_state::dna;
+        dna_bulge_aff.curr_bulge_size = 0;
+        dna_bulge_aff.dna_bulges += 1;
+      } 
+    }
+
+    if (dna_bulge_aff.state == bulge_state::dna
+        && dna_bulge_aff.curr_bulge_size < max_bulge_size
+        && position != query.length() - 1) {
+      dna_bulge_aff.curr_bulge_size += 1;
+
+      for (size_t i = 0; i < search_alphabet_size; i++) {
+        char a = search_alphabet[i];
+
+        size_t occ_before = csa.rank_bwt(sp, a);
+        size_t occ_within = csa.rank_bwt(ep + 1, a) - occ_before;
+
+        if (occ_within > 0) {
+          size_t sp_prime = csa.C[csa.char2comp[a]] + occ_before;
+          size_t ep_prime = sp_prime + occ_within - 1;
+
+          char a_lower = std::tolower(a); // to identify mismatches as lower case characters
+          inexact_search(query, position, sp_prime, ep_prime, sequence + a_lower, pams,
+                         mismatches, max_rna_bulges, max_dna_bulges, max_bulge_size,
+                         dna_bulge_aff, callback, data);
+        }
+      }
+    }
+
     if (position < 0) {
       std::function<void(size_t, size_t, size_t, std::string, t_data&)> matching_callback =
         [aff, callback](size_t sp, size_t ep, size_t mismatches, std::string sequence, t_data& data) {
@@ -331,41 +364,13 @@ namespace genomics {
       } 
     }
 
-    if (rna_bulge_aff.state == bulge_state::rna && rna_bulge_aff.curr_bulge_size < max_bulge_size) {
+    if (rna_bulge_aff.state == bulge_state::rna
+        && rna_bulge_aff.curr_bulge_size < max_bulge_size
+        && position != query.length() - 1 ) {
       rna_bulge_aff.curr_bulge_size += 1;
       inexact_search(query, position - 1, sp, ep, sequence + '.', pams, mismatches, 
                      max_rna_bulges, max_dna_bulges, max_bulge_size,
                      rna_bulge_aff, callback, data);
-    }
-
-    affinity dna_bulge_aff = aff;
-    if (max_dna_bulges > aff.dna_bulges) {
-      if (aff.state != bulge_state::dna || dna_bulge_aff.curr_bulge_size == max_bulge_size) {
-        dna_bulge_aff.state = bulge_state::dna;
-        dna_bulge_aff.curr_bulge_size = 0;
-        dna_bulge_aff.dna_bulges += 1;
-      } 
-    }
-
-    if (dna_bulge_aff.state == bulge_state::dna && dna_bulge_aff.curr_bulge_size < max_bulge_size) {
-      dna_bulge_aff.curr_bulge_size += 1;
-
-      for (size_t i = 0; i < search_alphabet_size; i++) {
-        char a = search_alphabet[i];
-
-        occ_before = csa.rank_bwt(sp, a);
-        occ_within = csa.rank_bwt(ep + 1, a) - occ_before;
-
-        if (occ_within > 0) {
-          size_t sp_prime = csa.C[csa.char2comp[a]] + occ_before;
-          size_t ep_prime = sp_prime + occ_within - 1;
-
-          char a_lower = std::tolower(a); // to identify mismatches as lower case characters
-          inexact_search(query, position, sp_prime, ep_prime, sequence + a_lower, pams,
-                         mismatches, max_rna_bulges, max_dna_bulges, max_bulge_size,
-                         dna_bulge_aff, callback, data);
-        }
-      }
     }
   }
 
