@@ -117,7 +117,7 @@ namespace genomics {
                         std::string sequence,
                         const std::vector<std::string> &pams,
                         size_t mismatches, 
-                        uint64_t k, 
+                        size_t k, 
                         const std::function<void(struct match, t_data&)> &callback,
                         t_data& data) const;
   };
@@ -187,7 +187,7 @@ namespace genomics {
                                                               std::string sequence,
                                                               const std::vector<std::string> &pams,
                                                               size_t mismatches, 
-                                                              uint64_t k, 
+                                                              size_t k, 
                                                               const std::function<void(struct match, t_data&)> &callback,
                                                               t_data& data) const {
     if (position < 0) {
@@ -195,8 +195,14 @@ namespace genomics {
         [k, callback](size_t sp, size_t ep, size_t mismatches, std::string sequence, t_data& data) {
           (void) mismatches;
 
+          // sticking in k causes a seg-fault...
           match m = {
-            sequence, sp, ep, k, 0, 0
+            .sequence = sequence,
+            .sp = sp,
+            .ep = ep,
+            .mismatches = k,
+            .dna_bulges = 0,
+            .rna_bulges = 0
           };
 
           return callback(m, data);
@@ -218,7 +224,7 @@ namespace genomics {
       size_t sp_prime = csa.C[csa.char2comp[c]] + occ_before;
       size_t ep_prime = sp_prime + occ_within - 1;
       inexact_search(query, position - 1, sp_prime, ep_prime, sequence + c, pams,
-                     mismatches, k + 1, callback, data);
+                     mismatches, k, callback, data);
     }
 
     if (k >= mismatches) return;
