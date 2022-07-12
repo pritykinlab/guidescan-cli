@@ -4,8 +4,11 @@
 #include <set>
 #include <list>
 #include <tuple>
+#include <chrono>
 
-#include "json.hpp"
+#include "spdlog/spdlog.h"
+#include "spdlog/fmt/fmt.h"
+
 #include "genomics/kmer.hpp"
 #include "genomics/sequences.hpp"
 #include "genomics/printer.hpp"
@@ -129,9 +132,25 @@ namespace genomics {
                                const genome_index<t_wt, t_dens, t_inv_dens>& gi_reverse,
                                const enumerate_cmd_options& opts,
                                const std::vector<kmer>& kmers,
-                               std::ostream& output, std::mutex& output_mtx) {
+                               std::ostream& output, std::mutex& output_mtx,
+                               std::atomic<uint64_t>& num_kmers_processed,
+                               uint64_t kmer_count,
+                               const std::chrono::steady_clock::time_point& begin) {
     for (auto &kmer : kmers) {
       process_kmer_to_stream(gi_forward, gi_reverse, opts, kmer, output, output_mtx);
+      num_kmers_processed.fetch_add(1);
+
+      if (num_kmers_processed % 100 == 0) { 
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - begin).count();
+        double kmers_per_s = ((double) num_kmers_processed) / ((double) elapsed);
+
+        std::string processed_f = fmt::format("Processed: {} kmers", fmt::format("{}/{}", num_kmers_processed.load(), kmer_count));
+        std::string elapsed_f = fmt::format("Elapsed: {} secs", elapsed);
+        std::string kmers_per_sec_f = fmt::format("Kmers/sec: {:.7}", kmers_per_s);
+
+        spdlog::info("{:<37}{:<30}{}", processed_f, elapsed_f, kmers_per_sec_f);
+      }
     }
   }
 }

@@ -1,10 +1,14 @@
 #include <thread>
 #include <istream>
 #include <memory>
+#include <atomic>
+#include <chrono>
 
 #include <sdsl/suffix_arrays.hpp>
 
-#include "json.hpp"
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+
 #include "genomics/index.hpp"
 #include "genomics/printer.hpp"
 #include "genomics/seq_io.hpp"
@@ -123,7 +127,7 @@ int do_index_cmd(const index_cmd_options& opts) {
     genomics::seq_io::reverse_complement_stream(is, os);
   }
 
-  cout << "Constructing genome index..." << endl;
+  spdlog::info("Constructing genomic index.");
 
   genomics::genome_structure gs;
   fasta_is.clear();
@@ -131,53 +135,52 @@ int do_index_cmd(const index_cmd_options& opts) {
   gs = genomics::seq_io::parse_genome_structure(fasta_is);
   genomics::seq_io::write_to_file(gs, genome_structure_file);
 
-  cout << "Constructing forward genomic index." << endl;
+  spdlog::info("Constructing forward genomic index.");
   sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> forward_fm_index;
   construct(forward_fm_index, forward_raw_sequence_file, 1);
   store_to_file(forward_fm_index, forward_fm_index_file);
 
-  cout << "Constructing reverse genomic index." << endl;
+  spdlog::info("Constructing reverse genomic index.");
   sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> reverse_fm_index;
   construct(reverse_fm_index, reverse_raw_sequence_file, 1);
   store_to_file(reverse_fm_index, reverse_fm_index_file);
 
-  cout << "Index construction complete." << endl;
+  spdlog::info("Index construction complete.");
   return 0;
 }
 
 int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   using namespace std;
 
+  const auto& error_log = spdlog::get("error");
+
   string forward_fm_index_file = opts.index_file_prefix + ".forward";
   string reverse_fm_index_file = opts.index_file_prefix + ".reverse";
   string genome_structure_file = opts.index_file_prefix + ".gs";
 
-  cout << "Loading genome index..." << endl;
+  spdlog::info("Loading genome index at \"{}\".", opts.index_file_prefix);
 
   genomics::genome_structure gs;
   if (!genomics::seq_io::load_from_file(gs, genome_structure_file)) {
-    cerr << "No genome structure file \"" << genome_structure_file
-         << "\" located. Abort." << endl;
+    error_log->error("No genome structure file {} located.", genome_structure_file);
     return 1;
   }
 
   sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> forward_fm_index;
   if (!load_from_file(forward_fm_index, forward_fm_index_file)) {
-    cerr << "No forward index file \"" << forward_fm_index_file
-         << "\" located. Abort." << endl;
+    error_log->error("No forward index file {} located.", forward_fm_index_file);
     return 1;
   }   
 
   sdsl::csa_wt<t_wt, t_sa_dens, t_isa_dens> reverse_fm_index;
   if (!load_from_file(reverse_fm_index, reverse_fm_index_file)) {
-    cerr << "No reverse index file \"" << reverse_fm_index_file
-         << "\" located. Abort." << endl;
+    error_log->error("No forward index file {} located.", reverse_fm_index_file);
     return 1;
   }   
 
   genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_forward(forward_fm_index, gs);
   genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_reverse(reverse_fm_index, gs);
-  cout << "Successfully loaded indices." << endl;
+  spdlog::info("Successfully loaded genome index.");
 
   ofstream output(opts.database_file);
   if (opts.out_format == "sam") {
@@ -186,32 +189,40 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
     genomics::write_csv_header(output);
   }
 
-  cout << "Reading in kmers." << endl;
+  spdlog::info("Loading kmers.");
   genomics::kmers_file_producer kmer_p(opts.kmers_file);
-
 
   // split kmers across threads.
   vector<vector<genomics::kmer>> kmers(opts.nthreads, vector<genomics::kmer>());
   genomics::kmer out_kmer;
-  for (int i = 0; kmer_p.get_next_kmer(out_kmer); i++) {
-    kmers[i % opts.nthreads].push_back(out_kmer);
+  int kmer_count = 0;
+  for (; kmer_p.get_next_kmer(out_kmer); kmer_count++) {
+    kmers[kmer_count % opts.nthreads].push_back(out_kmer);
   }
+
+  spdlog::info("Read in {} kmer(s).", kmer_count);
 
   std::mutex output_mtx;
   std::vector<std::string> pams = opts.alt_pams;
 
+  std::atomic<uint64_t> num_kmers_processed(0);
+  std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
   vector<thread> threads;
   for (size_t i = 0; i < opts.nthreads; i++) {
     thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
              cref(gi_forward), cref(gi_reverse),
              cref(opts), cref(kmers[i]),
-             ref(output), ref(output_mtx));
+             ref(output), ref(output_mtx), ref(num_kmers_processed), kmer_count, start_time);
     threads.push_back(move(t));
   }
 
   for (auto &thread : threads) {
     thread.join();
   }
+
+  std::chrono::steady_clock::time_point end_time = std::chrono::steady_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
+  spdlog::info("Processed {} kmers in {} seconds.", num_kmers_processed, elapsed_time);
  
   return 0;
 }
@@ -221,6 +232,11 @@ int main(int argc, char *argv[])
   CLI::App guidescan("Guidescan all-in-one interface.\n");
   guidescan.require_subcommand(1);
   guidescan.failure_message(CLI::FailureMessage::help);
+
+  auto console_logger = spdlog::stdout_color_mt("guidescan2");
+  spdlog::set_default_logger(console_logger);
+
+  auto error_logger = spdlog::stderr_color_mt("error");
 
   enumerate_cmd_options enumerate_opts;
   index_cmd_options index_opts;
