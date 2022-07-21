@@ -158,23 +158,29 @@ def output_succinct(record, offtargets):
     chrm = record.reference_name
     position = record.reference_start
     sense = '-' if record.is_reverse else '+'
-    
+
     match_counts = [0, 0, 0, 0]
     cfd_sum = None
     if offtargets:
         if all(offtarget['cfd'] is not None for offtarget in offtargets):
             cfd_sum =  sum((offtarget['cfd'] for offtarget in offtargets))
 
+        flag = False
+
         for offtarget in offtargets:
             match_counts[offtarget['distance']] += 1
 
+            if (offtarget['distance'] == 0 and flag == False and offtarget['cfd'] is not None and cfd_sum is not None):
+                cfd_sum -= offtarget['cfd']
+                flag = True
+
     if cfd_sum:
-        specificity = 1 / ((1 - min(1, match_counts[0])) + cfd_sum)
+        specificity = 1 / (1 + cfd_sum)
         if cfd_sum == 0:
             specificity = 1
     else:
         specificity = ''
-        
+
     print(','.join(list(map(str, [identifier, sequence, chrm, position, sense,
                                   match_counts[0], match_counts[1], match_counts[2],
                                   match_counts[3], specificity]))))
