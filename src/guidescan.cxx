@@ -42,8 +42,10 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.dna_bulges  = 0;
   opts.start       = false;
   opts.out_format  = "csv";
+  opts.max_off_targets = -1;
 
   opts.start_opt       = build->add_flag("--start", opts.start, "Match PAM at start of kmer instead at end (default).");
+  opts.max_off_targets_opt = build->add_option("--max-off-targets", opts.max_off_targets, "Maximum number of off-targets to store for each number of mismatches.", true);
   opts.nthreads_opt    = build->add_option("-n,--threads", opts.nthreads, "Number of threads to parallelize over", true);
   opts.alt_pams_opt    = build->add_option("-a,--alt-pam", opts.alt_pams, "Alternative PAMs used to find off-targets", true);
   opts.mismatches_opt  = build->add_option("-m,--mismatches", opts.mismatches, "Number of mismatches to allow when finding off-targets", true);
