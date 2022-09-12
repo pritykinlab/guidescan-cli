@@ -131,17 +131,11 @@ There are three sub-commands for the Guidescan2 tool.
 \item \texttt{index}: Constructs a genomic index from a FASTA file.
 \item \texttt{enumerate}: Enumerates off-targets against a reference
   genomic index for a particular set of kmers. 
-\item \texttt{http-server}: Spawns a local http-server that responds
-  to off-target queries. That is, for a GET request containing a
-  sequence of interest, enumerates all off-targets for that sequence.
 \end{itemize}
 The sub-commands each have their own interfaces, accessed as such:
 \begin{minted}[frame=lines]{shell-session}
   $ guidescan [SUBCOMMAND] --help
 \end{minted}
-For almost all use cases, it will suffice to stick to the main
-\texttt{enumerate} and \texttt{index} commands, the others are only
-helpers for very specific purposes.
 
 \subsection{Genome Indexing}
 
@@ -151,19 +145,20 @@ helpers for very specific purposes.
 
 The \texttt{index} sub-command takes a FASTA file as input and
 constructs a compressed genomic index that is used for off-target
-search. The index is stored as three files in the current working
-directory with the name \texttt{*.index.*}. The index
-consists of a forward and reverse strand index as well as a small
-metadata file containing chromosome information. Auxiliary files with
-extensions \texttt{.forward.fna} and \texttt{.reverse.fna} are written
-to disk during the indexing process but these can be deleted once the
-genome is constructed.
+search. By default, the index is stored as three files in the same
+directory as the FASTA file with the name \texttt{*.index.*}. The
+indices consist of a forward and reverse strand index as well as a
+small metadata file containing chromosome information. Auxiliary files
+with extensions \texttt{.forward.fna} and \texttt{.reverse.fna} are
+written to disk during the indexing process but these can be deleted
+once the genome is constructed.
 
 The \texttt{index} step is the only step that requires a decent amount
 of memory to execute. For the human reference genome, 32GB of memory
 will suffice. However once the indices are constructed they can be
 transferred across devices as they are relatively small. Indices for a
-wide variety of genomes are available at ????. And though this steps
+wide variety of genomes are available at
+\texttt{https://guidescan.com/downloads}. And though this steps
 requires a moderate amount of memory, it is quick to execute, taking
 under thirty minutes on a Lenovo Thinkpad t490 with 32GB of RAM and an
 8-core processor.
@@ -173,32 +168,51 @@ under thirty minutes on a Lenovo Thinkpad t490 with 32GB of RAM and an
   $ guidescan enumerate --help
 \end{minted}
 
+\begin{figure}[!htb]
+  \begin{tabular}{|l|l|}
+    \hline
+    Option            & Description                                                                                                                                                                                                                                                                                         \\ \hline
+    \texttt{--start}           & \begin{tabular}[c]{@{}l@{}}Specify whether the PAM should be matched at the start or end of the\\ protospacer sequence. The default is FALSE, in which the PAM is at\\ the 3' end of the protospacer.\end{tabular}                                                                                  \\ \hline
+    \texttt{--max-off-targets} & \begin{tabular}[c]{@{}l@{}}Maximum number of off-targets to store at each mismatch distance. If \\ this takes a negative value, all off-targets are enumerated at that distance.\\ The default value is -1, in which all off-targets are enumerated.\end{tabular}                                   \\ \hline
+    \texttt{-n, --threads}     & \begin{tabular}[c]{@{}l@{}}The number of threads to use in finding off-targets. The kmers file will\\ be split into pieces and each piece will be enumerated across different \\ threads. The default value is the number of threads the machine \\ possesses.\end{tabular}                         \\ \hline
+    \texttt{-a, --alt-pam}     & \begin{tabular}[c]{@{}l@{}}The set of alternative PAMs used to find off-targets. That is, if there exists\\ an off-target with one of the specified alternative PAMs, it will be output. \\ Input is given as a comma  separated list of PAMs. The default value is the \\ empty list.\end{tabular} \\ \hline
+    \texttt{-m, --mismatches}  & \begin{tabular}[c]{@{}l@{}}The maximum distance from the input sequence an off-target can have. \\ The default value is 3.\end{tabular}                                                                                                                                                             \\ \hline
+    \texttt{--rna-bulges}      & \begin{tabular}[c]{@{}l@{}}The number of RNA bulges to allow in the protospacer when finding\\ off-targets. The default value is 0 as this can greatly increase the \\ running time.\end{tabular}                                                                                                   \\ \hline
+    \texttt{--dna-bulges}      & \begin{tabular}[c]{@{}l@{}}The number of DNA bulges to allow in the off-target when finding\\ off-targets. The default value is 0 as this can greatly increase the \\ running time.\end{tabular}                                                                                                    \\ \hline
+    \texttt{-t, --threshold}   & \begin{tabular}[c]{@{}l@{}}Removes sequences from output with off-targets at a distance at\\ or below this threshold. If this takes a negative value, no thresholding\\ of off-targets is performed and all sequences are included in output.\\ The default value is 1.\end{tabular}                \\ \hline
+    \texttt{--format}          & The format of the output file. The default value is csv.                                                                                                                                                                                                                                            \\ \hline
+    \texttt{-f, --kmers-file}  & \begin{tabular}[c]{@{}l@{}}The file containing the set of kmers to enumerate off-targets against. This\\ is a CSV file format that is described in the manual. This option is required.\end{tabular}                                                                                                \\ \hline
+    \texttt{-o, --output}      & The name of the output file. This option is required.                                                                                                                                                                                                                                               \\ \hline
+  \end{tabular}
+  \caption{\label{fig:enumerate_options} Options for the \texttt{enumerate}
+    sub-command.}
+\end{figure}
+
+
 Once an index is constructed, off-target enumeration proceeds in an
 online fashion with the \texttt{enumerate} sub-command. Input to this
-command is a pointer to a reference index and a set of kmers to
-evaluate off-targets against. PAMs are included in this kmer set and
-are matched at the specified end of the kmer. The output is a database
-in SAM file format containing kmers that have passed the Guidescan2
-filtering step. Complete off-target information is hex-encoded in the
+command is an index and a set of kmers to evaluate off-targets
+against. PAMs are included in this kmer set and are matched at the
+specified end of the kmer. The output is a database in SAM file format
+containing kmers that have passed the Guidescan2 filtering
+step. Complete off-target information is hex-encoded in the
 \texttt{of} field and can be decoded using an included Python3 script
 described later.
 
-The command understands several options. Most importantly is the flag
-\texttt{-k/--mismatches} that describes the mismatch radius to search
+The command understands several options that are described fully in
+(Figure \ref{fig:enumerate_options}). Most importantly is the flag
+\texttt{-m/--mismatches} that describes the mismatch radius to search
 for kmer matches within. Typically, this parameter is set to a small
-value of, typically at most 3 or 4, as the search complexity grows
+value of, typically at most 4 or 5, as the search complexity grows
 exponentially with this parameter. Second, it is often useful to
 specify an alternative set of PAMs to match off-targets against since
 different CRISPR systems have varying PAM specificity. Of course this
 step can be emulated using repeated calls to \texttt{enumerate} with
 different PAMs, but we include this as a feature for
 convenience. Multi-threading across cores is available with the
-\texttt{--threads} option. This may result in out of order entries
+\texttt{-n/--threads} option. This may result in out of order entries
 compared to the input kmer set since threads may complete off-target
 enumeration at different speeds.
-
-We should also note that kmers that have multiple perfect matches are
-thrown away by default. This behavior can be turned off...
 
 The enumerate command {\bf requires} a set of genomic sequences to
 evaluate, we refer to these as the {\it kmer set}. The kmer set is
