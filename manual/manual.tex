@@ -221,10 +221,10 @@ off-targets don't need a PAM.
   \centering
   \begin{minted}[frame=lines]{text}
 id,sequence,pam,chromosome,position,sense
-cell_example_1,GCCGTTCAGGAGCTCGACGA,NGG,chrIV,5499,-
-cell_example_2,CAAAATATGAAATTTTCAAG,NGG,chrIV,23896,+
-cell_example_3,TCTACTGAAAGTTTGCAAAA,,chrIV,5499,-
-cell_example_4,TATAAACTGTCAAAGTTGAG,NGG,chrIV,23703,+
+ce11_example_1,GCCGTTCAGGAGCTCGACGA,NGG,chrIV,5499,-
+ce11_example_2,CAAAATATGAAATTTTCAAG,NGG,chrIV,23896,+
+ce11_example_3,TCTACTGAAAGTTTGCAAAA,,chrIV,5499,-
+ce11_example_4,TATAAACTGTCAAAGTTGAG,NGG,chrIV,23703,+
   \end{minted}
   \caption{\label{fig:kmer_set}: An example kmer file for the
     Caenorhabditis elegans genome.}
@@ -517,7 +517,7 @@ temporary files with extension \texttt{.sdsl} will be created and
 subsequently deleted during this process.
 
 \begin{minted}[frame=lines]{shell-session}
-  $ guidescan index --index cell.index GCF_000002985.6_WBcel235_genomic.fna
+  $ guidescan index --index ce11.index GCF_000002985.6_WBcel235_genomic.fna
   $ rm GCF_000002985.6_WBcel235_genomic.fna.*.dna
 \end{minted}
 
@@ -552,7 +552,7 @@ example, we will enumerate gRNAs in a sequential fashion.
 
 \begin{minted}[frame=lines]{shell-session}
   $ for f in cell.*.csv; do\
-  guidescan enumerate cell.index -f $f -n 1 --format sam -o $f.sam -a NAG;\
+  guidescan enumerate ce11.index -f $f -n 1 --format sam -o $f.sam -a NAG;\
   done
 \end{minted}
 
@@ -581,7 +581,7 @@ quick.
 
 \vspace{-0.8em}
 \begin{minted}[frame=lines, breaklines]{shell-session}
-  $ python scripts/decode_database.py cell.sam\ GCF_000002985.6_WBcel235_genomic.fna > cell.csv
+  $ python scripts/decode_database.py cell.sam\ GCF_000002985.6_WBcel235_genomic.fna > ce11.csv
 \end{minted}
 
 \begin{figure}[ht]
