@@ -2,7 +2,7 @@
 #define PROCESS_H
 
 #include <set>
-#include <list>
+#include <vector>
 #include <tuple>
 #include <chrono>
 
@@ -95,7 +95,7 @@ namespace genomics {
      * that they can be distinguished.
      */
 
-    std::vector<std::list<std::tuple<int64_t, match>>> off_targets(opts.mismatches + 1);
+    std::vector<std::vector<std::tuple<int64_t, match>>> off_targets(opts.mismatches + 1);
     for (size_t i = 0; i < opts.mismatches + 1; i++) {
       for (const auto& m : forward_off_targets_bwt[i]) {
         for (size_t j = m.sp; j <= m.ep; j++) {
@@ -118,7 +118,7 @@ namespace genomics {
       output << csv_lines;
       output_mtx.unlock();
     } else {
-      std::string sam_line = genomics::get_sam_line(gi_forward, k, opts.start, off_targets);
+      std::string sam_line = genomics::get_sam_line(gi_forward, k, opts.start, opts.max_off_targets, off_targets);
       output_mtx.lock();
       output << sam_line << std::endl;
       output_mtx.unlock();

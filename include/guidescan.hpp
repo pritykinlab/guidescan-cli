@@ -30,6 +30,9 @@ struct enumerate_cmd_options {
   size_t nthreads;
   CLI::Option* nthreads_opt = nullptr;
 
+  int64_t max_off_targets;
+  CLI::Option* max_off_targets_opt = nullptr;
+
   bool start;
   CLI::Option* start_opt = nullptr;
 

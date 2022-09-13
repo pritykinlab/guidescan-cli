@@ -4,10 +4,11 @@
 #include "genomics/structures.hpp"
 #include "genomics/sequences.hpp"
 
+#include <algorithm>
+#include <random>
 #include <tuple>
 #include <iostream>
 #include <vector>
-#include <list>
 
 namespace genomics {
   namespace {
@@ -92,15 +93,26 @@ namespace genomics {
     }
 
     std::string off_target_string(genome_structure gs,
-                                  std::vector<std::list<std::tuple<int64_t, match>>>& off_targets) {
+                                  std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets,
+                                  int64_t max_off_targets) {
       uint64_t delim = get_delim(gs);
       std::string out("");
 
       for (uint64_t k = 0; k < off_targets.size(); k++) {
           std::list<int64_t> v;
 
-          for (const auto& t : off_targets[k]) {
-              v.push_back(std::get<0>(t));
+          if (max_off_targets != -1) { 
+              std::shuffle(off_targets[k].begin(), off_targets[k].end(), std::mt19937{std::random_device{}()});
+              int64_t count = 0;
+              for (const auto& t : off_targets[k]) {
+                  if (count >= max_off_targets) break;
+                  v.push_back(std::get<0>(t));
+                  count++;
+              }
+          } else {
+            for (const auto& t : off_targets[k]) {
+                v.push_back(std::get<0>(t));
+            }
           }
 
           v.push_back(k);
@@ -168,7 +180,7 @@ namespace genomics {
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_csv_lines(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                             const kmer& k, bool start,
-                            std::vector<std::list<std::tuple<int64_t, match>>>& off_targets) {
+                            std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets) {
     std::string csvlines;
 
     for (uint64_t d = 0; d < off_targets.size(); d++) {
@@ -185,8 +197,8 @@ namespace genomics {
 
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_sam_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
-                           const kmer& k, bool start,
-                           std::vector<std::list<std::tuple<int64_t, match>>>& off_targets) {
+                           const kmer& k, bool start, int64_t max_off_targets,
+                           std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets) {
     std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
     std::string samline(k.id);
 
@@ -213,7 +225,12 @@ namespace genomics {
     }
 
     if (!no_off_targets) {
-      std::string ots = off_target_string(gi.gs, off_targets);
+      // store off-target counts in tag
+      for (uint64_t k = 0; k < off_targets.size(); k++) {
+          samline += "\tk" + std::to_string(k) + ":i:" + std::to_string(off_targets[k].size());
+      }
+
+      std::string ots = off_target_string(gi.gs, off_targets, max_off_targets);
       samline += "\tof:H:" + ots;
     }
 
