@@ -475,7 +475,7 @@ Finally, our {\it kmer set} is ready to run through Guidescan2. After
 moving everything to the correct directory, we can evaluate our {\it
   kmer set} with the following command.  \vspace{-0.8em}
 \begin{minted}[frame=lines]{shell-session}
-  $ guidescan enumerate ~/ncbi-*/hg38 -f kmers.csv -n 1 -o db.sam -a NAG
+  $ guidescan enumerate ~/ncbi-*/hg38 -f kmers.csv -n 1 --format sam -o db.sam -a NAG
 \end{minted}
 As an estimate of time, this process took less than 10 minutes on a
 Thinkpad t490. Since kmers are evaluated synchronously and written in
