@@ -221,10 +221,10 @@ off-targets don't need a PAM.
   \centering
   \begin{minted}[frame=lines]{text}
 id,sequence,pam,chromosome,position,sense
-ce11_example_1,GCCGTTCAGGAGCTCGACGA,NGG,chrIV,5499,-
-ce11_example_2,CAAAATATGAAATTTTCAAG,NGG,chrIV,23896,+
-ce11_example_3,TCTACTGAAAGTTTGCAAAA,,chrIV,5499,-
-ce11_example_4,TATAAACTGTCAAAGTTGAG,NGG,chrIV,23703,+
+cell_example_1,GCCGTTCAGGAGCTCGACGA,NGG,chrIV,5499,-
+cell_example_2,CAAAATATGAAATTTTCAAG,NGG,chrIV,23896,+
+cell_example_3,TCTACTGAAAGTTTGCAAAA,,chrIV,5499,-
+cell_example_4,TATAAACTGTCAAAGTTGAG,NGG,chrIV,23703,+
   \end{minted}
   \caption{\label{fig:kmer_set}: An example kmer file for the
     Caenorhabditis elegans genome.}
@@ -272,12 +272,14 @@ human-readable format.
 
 \subsection{Decoding}
 
-The script \texttt{decode\_kmers.py} is a Python3 script that decodes
+The script \texttt{decode\_database.py} is a Python3 script that decodes
 Guidescan2 databases sequentially into a human-readable CSV format. It
 takes the Guidescan2 SAM/BAM database and the original FASTA file as
 input and outputs a CSV to \texttt{stdout}. The script outputs
 information in two modes, denoted {\it succinct} and {\it
   complete}, which we will describe below.
+
+The dependencies for the script are Python3, pysam and the Biopython toolkit.
 
 For most use cases {\it succinct} mode will be sufficient. In this
 mode each kmer's off-targets are decoded and the information is
@@ -535,7 +537,7 @@ script with our desired parameters.
 
 \begin{minted}[frame=lines]{shell-session}
   $ python scripts/generate_kmers.py --pam NGG --prefix "example-"\
-    cell.fna > cell.kmers
+    GCF_000002985.6_WBcel235_genomic.fna > cell.kmers
 \end{minted}
 
 To enable parallel execution, we partition our kmer set across 100
@@ -550,7 +552,7 @@ example, we will enumerate gRNAs in a sequential fashion.
 
 \begin{minted}[frame=lines]{shell-session}
   $ for f in cell.*.csv; do\
-  guidescan enumerate ce11.index -f $f -n 1 -o $f.sam -a NAG;\
+  guidescan enumerate cell.index -f $f -n 1 --format sam -o $f.sam -a NAG;\
   done
 \end{minted}
 
@@ -579,7 +581,7 @@ quick.
 
 \vspace{-0.8em}
 \begin{minted}[frame=lines, breaklines]{shell-session}
-  $ python scripts/decode_database.py cell.sam\ GCF_000002985.6_WBcel235_genomic.fna > ce11.csv
+  $ python scripts/decode_database.py cell.sam\ GCF_000002985.6_WBcel235_genomic.fna > cell.csv
 \end{minted}
 
 \begin{figure}[ht]
