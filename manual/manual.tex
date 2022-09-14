@@ -286,12 +286,14 @@ human-readable format.
 
 \subsection{Decoding}
 
-The script \texttt{decode\_kmers.py} is a Python3 script that decodes
+The script \texttt{decode\_database.py} is a Python3 script that decodes
 Guidescan2 databases sequentially into a human-readable CSV format. It
 takes the Guidescan2 SAM/BAM database and the original FASTA file as
 input and outputs a CSV to \texttt{stdout}. The script outputs
 information in two modes, denoted {\it succinct} and {\it
   complete}, which we will describe below.
+
+The dependencies for the script are Python3, pysam and the Biopython toolkit.
 
 For most use cases {\it succinct} mode will be sufficient. In this
 mode each kmer's off-targets are decoded and the information is
@@ -473,7 +475,7 @@ Finally, our {\it kmer set} is ready to run through Guidescan2. After
 moving everything to the correct directory, we can evaluate our {\it
   kmer set} with the following command.  \vspace{-0.8em}
 \begin{minted}[frame=lines]{shell-session}
-  $ guidescan enumerate ~/ncbi-*/hg38 -f kmers.csv -n 1 -o db.sam -a NAG
+  $ guidescan enumerate ~/ncbi-*/hg38 -f kmers.csv -n 1 --format sam -o db.sam -a NAG
 \end{minted}
 As an estimate of time, this process took less than 10 minutes on a
 Thinkpad t490. Since kmers are evaluated synchronously and written in
@@ -529,7 +531,7 @@ temporary files with extension \texttt{.sdsl} will be created and
 subsequently deleted during this process.
 
 \begin{minted}[frame=lines]{shell-session}
-  $ guidescan index --index cell.index GCF_000002985.6_WBcel235_genomic.fna
+  $ guidescan index --index ce11.index GCF_000002985.6_WBcel235_genomic.fna
   $ rm GCF_000002985.6_WBcel235_genomic.fna.*.dna
 \end{minted}
 
@@ -549,7 +551,7 @@ script with our desired parameters.
 
 \begin{minted}[frame=lines]{shell-session}
   $ python scripts/generate_kmers.py --pam NGG --prefix "example-"\
-    cell.fna > cell.kmers
+    GCF_000002985.6_WBcel235_genomic.fna > cell.kmers
 \end{minted}
 
 To enable parallel execution, we partition our kmer set across 100
@@ -564,7 +566,7 @@ example, we will enumerate gRNAs in a sequential fashion.
 
 \begin{minted}[frame=lines]{shell-session}
   $ for f in cell.*.csv; do\
-  guidescan enumerate ce11.index -f $f -n 1 -o $f.sam -a NAG;\
+  guidescan enumerate ce11.index -f $f -n 1 --format sam -o $f.sam -a NAG;\
   done
 \end{minted}
 
