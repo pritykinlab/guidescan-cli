@@ -65,18 +65,18 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 ## CFD Score ##
 ###############
 
-def calc_cfd_e(wt,sg,pam,mm_scores,pam_scores):
+def calc_cfd_e(sg,wt,pam,mm_scores,pam_scores):
     score = 1
-    sg = sg.replace('T','U')
     wt = wt.replace('T','U')
-    s_list = list(sg)
+    sg = sg.replace('T','U')
     wt_list = list(wt)
-    for i,sl in enumerate(s_list):
-        if wt_list[i] == sl:
+    sg_list = list(sg)
+    for i,wl in enumerate(wt_list):
+        if sg_list[i] == wl:
             score*=1
         else:
             try:
-                key = 'r'+wt_list[i]+':d'+revcom(sl)+','+str(i+1)
+                key = 'r'+sg_list[i]+':d'+revcom(wl)+','+str(i+1)
                 score*= mm_scores[key]
             except KeyError:
                 continue
@@ -102,7 +102,7 @@ MM_PKL = SCRIPT_DIR + "/cfd/mismatch_score.pkl"
 mm_scores, pam_scores = get_mm_pam_scores(MM_PKL, PAM_PKL)
 
 # Curry last two arguments for ease of use
-calc_cfd = lambda wt, sg, pam: calc_cfd_e(wt, sg, pam, mm_scores, pam_scores)
+calc_cfd = lambda sg, wt, pam: calc_cfd_e(sg, wt, pam, mm_scores, pam_scores)
 
 def decode_off_targets(sam_record, genome, delim, fasta_record_dict):
     if not sam_record.has_tag('of'):
@@ -116,11 +116,13 @@ def decode_off_targets(sam_record, genome, delim, fasta_record_dict):
         chrm, pos, strand = map_int_to_coord(pos, genome)
 
         sgrna = sam_record.query_sequence
+        if sam_record.is_reverse:
+            sgrna = revcom(sgrna)
+
         offtarget = str(map_coord_to_sequence(fasta_record_dict, sgrna, chrm, pos, strand))
 
         if len(offtarget) == 23:
             seq = revcom(offtarget) if strand == '-' else offtarget 
-            sgrna = revcom(sgrna) if strand == '-' else sgrna
             cfd = calc_cfd(sgrna, seq[:20], seq[21:23])
         else:
             cfd = None
