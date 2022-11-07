@@ -14,15 +14,13 @@ jobs:
       fail-fast: false
 
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
 
         include:
           - os: ubuntu-latest
             cmake_generator: "Unix Makefiles"
           - os: macos-latest
             cmake_generator: "Unix Makefiles"
-          - os: windows-latest
-            cmake_generator: "MinGW Makefiles"
 
     defaults:
       run:
