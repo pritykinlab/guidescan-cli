@@ -3,6 +3,8 @@
 
 #include "genomics/structures.hpp"
 #include "genomics/sequences.hpp"
+#include "genomics/doench.hpp"
+#include "version.hpp"
 
 #include <algorithm>
 #include <random>
@@ -92,67 +94,97 @@ namespace genomics {
       return -(delim + 1);
     }
 
-    std::string off_target_string(genome_structure gs,
-                                  std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets,
-                                  int64_t max_off_targets) {
-      uint64_t delim = get_delim(gs);
-      std::string out("");
+    float calculate_cfd(std::string sgRNA, std::string sequence, std::string PAM) {
+      float cfd = 1.0;
+      for (int i=0; i<sgRNA.length(); i++) {
+        char _sgRNA = sgRNA.at(i);
+        char _sequence = sequence.at(i);
+        if (_sgRNA != _sequence) {
+          if (_sgRNA == 'T') _sgRNA = 'U';
+          auto key = fmt::format("r{}:d{},{}", _sgRNA, static_cast<char>(toupper(complement(_sequence))), i+1);
+          cfd *= genomics::mm_scores[key];
+        }
+      }
+      cfd *= genomics::pam_scores[PAM.substr(1,2)];
+      return cfd;
+    }
 
-      for (uint64_t k = 0; k < off_targets.size(); k++) {
+    std::tuple<std::string, float> off_target_fields(const kmer& k,
+                                                     genome_structure gs,
+                                                     std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets,
+                                                     int64_t max_off_targets) {
+      uint64_t delim = get_delim(gs);
+      std::string offtarget_hex("");
+      float cfd_sum = 0.0;
+
+      for (uint64_t i = 0; i < off_targets.size(); i++) {
           std::list<int64_t> v;
 
-          if (max_off_targets != -1) { 
-              std::shuffle(off_targets[k].begin(), off_targets[k].end(), std::mt19937{std::random_device{}()});
-              int64_t count = 0;
-              for (const auto& t : off_targets[k]) {
-                  if (count >= max_off_targets) break;
-                  v.push_back(std::get<0>(t));
-                  count++;
-              }
-          } else {
-            for (const auto& t : off_targets[k]) {
-                v.push_back(std::get<0>(t));
-            }
+          std::shuffle(off_targets[i].begin(), off_targets[i].end(), std::mt19937{std::random_device{}()});
+          int64_t n_off_targets = 0;
+          for (const auto& t : off_targets[i]) {
+              if ((max_off_targets != -1) && (n_off_targets >= max_off_targets))
+                  break;
+              auto pos = std::get<0>(t);
+              auto match = std::get<1>(t);
+
+              coordinates c;
+              std::string strand;
+              tie(c, strand) = resolve_absolute(gs, pos, k);
+              if (c.chr.name == "") continue;
+              v.push_back(pos);
+
+              cfd_sum += calculate_cfd(k.sequence, complement(match.sequence), k.pam);
+
+              n_off_targets++;
           }
 
-          v.push_back(k);
+          v.push_back(i);
           v.push_back(delim);
-          
-          out += list_to_little_endian_hex(v);
+
+          offtarget_hex += list_to_little_endian_hex(v);
       }
 
-      return out;
+      float specificity = 0.0;
+      if (cfd_sum > 0) specificity = 1/cfd_sum;
+
+      return std::make_tuple(offtarget_hex, specificity);
     }
   };
 
   void write_sam_header(std::ostream& os, genome_structure gs) {
     os << "@HD\tVN:1.0\tSO:unknown" << std::endl;
+    os << "@PG\tID:Guidescan\tVN:" << std::string(GUIDESCAN_VERSION) << std::endl;
     for (const auto& chr : gs) {
       os << "@SQ\tSN:" << chr.name << "\tLN:" << chr.length << std::endl;
     }
   }
 
-  void write_csv_header(std::ostream& os) {
-    os << "id,sequence,match_chrm,match_position,match_strand,match_sequence,match_distance,rna_bulges,dna_bulges" << std::endl;
+  void write_csv_header(std::ostream& os, bool complete) {
+    os << "id,sequence,match_chrm,match_position,match_strand,match_distance";
+    if (complete) {
+      os << ",match_sequence,rna_bulges,dna_bulges";
+    }
+    os << ",specificity" << std::endl;
   }
 
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_csv_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                            const kmer& k, bool start, match m,
-                           int64_t off_target_abs_coords) {
+                           int64_t off_target_abs_coords, bool complete) {
+
+    coordinates c;
+    std::string strand;
+    tie(c, strand) = resolve_absolute(gi.gs, off_target_abs_coords, k);
+
+    if (c.chr.name=="") return std::string("");  // Handle sentinel value for boundary conditions
+
     std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
     std::string csvline(k.id);
 
     csvline += ",";
     csvline += sequence;
 
-    std::string strand("+");
-    if (off_target_abs_coords < 0) {
-      off_target_abs_coords = -off_target_abs_coords;
-      strand = "-";
-    }
-
-    coordinates c = resolve_absolute(gi.gs, (uint64_t) off_target_abs_coords);
     csvline += ",";
     csvline += c.chr.name;
 
@@ -163,16 +195,18 @@ namespace genomics {
     csvline += strand;
 
     csvline += ",";
-    csvline += complement(m.sequence);
-
-    csvline += ",";
     csvline += std::to_string(m.mismatches);
 
-    csvline += ",";
-    csvline += std::to_string(m.rna_bulges);
+    if (complete) {
+      csvline += ",";
+      csvline += complement(m.sequence);
 
-    csvline += ",";
-    csvline += std::to_string(m.dna_bulges);
+      csvline += ",";
+      csvline += std::to_string(m.rna_bulges);
+
+      csvline += ",";
+      csvline += std::to_string(m.dna_bulges);
+    }
 
     return csvline;
   }
@@ -180,16 +214,31 @@ namespace genomics {
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_csv_lines(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                             const kmer& k, bool start,
-                            std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets) {
+                            int64_t max_off_targets,
+                            std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets, bool complete) {
     std::string csvlines;
 
+    float cfd_sum = 0.0;
+    std::vector<std::string> off_targets_lines;
     for (uint64_t d = 0; d < off_targets.size(); d++) {
-      for (const auto& off_target : off_targets[d]) {
+      for (int64_t i = 0; i < off_targets[d].size(); i++) {
+        if ((max_off_targets != -1) && (i >= max_off_targets)) break;
+        const auto& off_target = off_targets[d][i];
         int64_t off_target_abs_coords = std::get<0>(off_target);
         match match = std::get<1>(off_target);
-        csvlines += get_csv_line(gi, k, start, match, off_target_abs_coords);
-        csvlines += "\n";
+        std::string csvline = get_csv_line(gi, k, start, match, off_target_abs_coords, complete);
+        if (csvline != "") {
+          off_targets_lines.push_back(csvline);
+          cfd_sum += calculate_cfd(k.sequence, complement(match.sequence), k.pam);
+        }
       }
+    }
+
+    // Each off-target will have the same specificity value - add at the end of each line
+    float specificity = 0.0;
+    if (cfd_sum > 0) specificity = 1/cfd_sum;
+    for (auto line: off_targets_lines) {
+      csvlines += line + "," + std::to_string(specificity) + "\n";
     }
 
     return csvlines;
@@ -198,30 +247,34 @@ namespace genomics {
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_sam_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
                            const kmer& k, bool start, int64_t max_off_targets,
-                           std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets) {
+                           std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets,
+                           bool complete) {
     std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
-    std::string samline(k.id);
+    std::string samline(k.id);                                     // SAM:QNAME
 
     samline += "\t";
-    samline += k.dir == direction::positive ? "0" : "16";
-    samline += "\t" + k.chromosome;
+    samline += k.dir == direction::positive ? "0" : "16";          // SAM:FLAG (16 => SEQ being reverse complemented)
+    samline += "\t" + k.chromosome;                                // SAM:RNAME
 
-    samline += "\t" + std::to_string(k.position);
-    samline += "\t100";
-    samline += "\t" + std::to_string(sequence.length()) + "M";
-    samline += "\t*\t0\t0";
+    samline += "\t" + std::to_string(k.position + 1);              // SAM:POS (1-indexed)
+    samline += "\t100";                                            // SAM:MAPQ
+    samline += "\t" + std::to_string(sequence.length()) + "M";     // SAM:CIGAR
+    samline += "\t*\t0\t0";                                        // SAM:RNEXT, SAM:PNEXT, SAM:TLEN
 
     if (k.dir == direction::negative) {
-      samline += "\t" + reverse_complement(sequence);
+      samline += "\t" + reverse_complement(sequence);              // SAM:SEQ
     } else {
-      samline += "\t" + sequence;
+      samline += "\t" + sequence;                                  // SAM:SEQ
     }
 
-    samline += "\t*";
+    samline += "\t*";                                              // SAM:QUAL
 
     bool no_off_targets = true;
     for (const auto& v : off_targets) {
-      if (!v.empty()) no_off_targets = false;
+      if (!v.empty()) {
+          no_off_targets = false;
+          break;
+      }
     }
 
     if (!no_off_targets) {
@@ -230,8 +283,14 @@ namespace genomics {
           samline += "\tk" + std::to_string(k) + ":i:" + std::to_string(off_targets[k].size());
       }
 
-      std::string ots = off_target_string(gi.gs, off_targets, max_off_targets);
-      samline += "\tof:H:" + ots;
+      std::string offtarget_hex;
+      float specificity;
+      tie(offtarget_hex, specificity) = off_target_fields(k, gi.gs, off_targets, max_off_targets);
+
+      if (complete) {
+          samline += "\tof:H:" + offtarget_hex;
+      }
+      samline += "\tsp:f:" + std::to_string(specificity);
     }
 
     return samline;

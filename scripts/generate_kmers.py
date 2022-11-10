@@ -96,7 +96,8 @@ def find_kmers(pam, k, chrm, forward=True, end=True):
         if position < 0:
             continue
 
-        yield (kmer.upper(), position)
+        # Return the 1-indexed position to caller
+        yield kmer.upper(), position+1
 
 def find_all_kmers(pam, k, chrm, end=True):
     pam_set = generate_pam_set(pam)

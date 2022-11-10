@@ -24,7 +24,7 @@ namespace genomics {
 
     /* 
        A kmer_producer constructed on top of a kmers file that contains a
-       list of kmers seperated by newlines.
+       list of kmers (with 1-indexed positions) seperated by newlines.
     */
     class kmers_file_producer : public kmer_producer {
     private:

@@ -27,6 +27,9 @@ struct enumerate_cmd_options {
   std::string out_format;
   CLI::Option* out_format_opt = nullptr;
 
+  std::string out_mode;
+  CLI::Option* out_mode_opt = nullptr;
+
   size_t nthreads;
   CLI::Option* nthreads_opt = nullptr;
 

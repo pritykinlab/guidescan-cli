@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+        include:
+          - os: ubuntu-latest
+            cmake_generator: "Unix Makefiles"
+          - os: macos-latest
+            cmake_generator: "Unix Makefiles"
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Envvars
+        run: |
+          echo "GUIDESCAN_VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "GUIDESCAN_NAME=guidescan-${GITHUB_REF/refs\/tags\//}-${{ runner.os }}" >> $GITHUB_ENV
+
+      - name: Build
+        run: |
+          cmake -DGUIDESCAN_VERSION=$GUIDESCAN_VERSION -G "${{ matrix.cmake_generator }}" -S . -B build
+          cmake --build build
+
+      - name: Guidescan version 
+        run: |
+          ./build/bin/guidescan --version
+
+      - name: Generate binary release file
+        run: |
+          mkdir -p $GUIDESCAN_NAME/bin
+          cp -r include $GUIDESCAN_NAME/
+          cp -r scripts $GUIDESCAN_NAME/
+          cp build/bin/guidescan* $GUIDESCAN_NAME/bin/
+          cd $GUIDESCAN_NAME && tar -czvf ../$GUIDESCAN_NAME.tar.gz *
+
+      - name: Release binary
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{env.GUIDESCAN_NAME}}.tar.gz
+
+      - name: Generate source release file
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          git ls-files | tar czf guidescan-${{env.GUIDESCAN_VERSION}}-src.tar.gz --files-from -
+
+      - name: Release source
+        if: ${{ runner.os == 'Linux' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: osqp-${{env.GUIDESCAN_VERSION}}-src.tar.gz
