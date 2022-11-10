@@ -15,6 +15,7 @@
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"
 #include "guidescan.hpp"
+#include "version.hpp"
 
 #define t_sa_dens 64
 #define t_isa_dens 8192
@@ -232,6 +233,8 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
 int main(int argc, char *argv[])
 {
   CLI::App guidescan("Guidescan all-in-one interface.\n");
+  guidescan.set_version_flag("--version", std::string(GUIDESCAN_VERSION));
+
   guidescan.require_subcommand(1);
   guidescan.failure_message(CLI::FailureMessage::help);
 
