@@ -38,7 +38,6 @@ def hex_to_offtargetinfo(hexstr, delim):
 def map_int_to_coord(x, genome, onebased=False):
     strand = '+' if x > 0 else '-'
     x = abs(x)
-    x -= 1
     i = 0
     while genome[i]['LN'] <= x:
         x -= genome[i]['LN']
@@ -52,11 +51,11 @@ def map_int_to_coord(x, genome, onebased=False):
 
 def map_coord_to_sequence(fasta_record_dict, sgrna, chr, pos, strand):
     if strand == '+':
-        pos_start = pos + 2 - len(sgrna)
-        pos_end = pos + 2
+        pos_start = pos + 1 - len(sgrna)
+        pos_end = pos + 1
     else:
-        pos_start = pos + 1
-        pos_end = pos + 1 + len(sgrna)
+        pos_start = pos
+        pos_end = pos + len(sgrna)
     return fasta_record_dict[chr].seq[pos_start:pos_end].upper()
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
