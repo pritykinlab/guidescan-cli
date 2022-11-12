@@ -1,3 +1,3 @@
 #ifndef GUIDESCAN_VERSION
-#define GUIDESCAN_VERSION "0.0.0"
+#define GUIDESCAN_VERSION "2.0.0"
 #endif
