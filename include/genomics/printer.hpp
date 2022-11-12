@@ -4,6 +4,7 @@
 #include "genomics/structures.hpp"
 #include "genomics/sequences.hpp"
 #include "genomics/doench.hpp"
+#include "spdlog/fmt/fmt.h"
 #include "version.hpp"
 
 #include <algorithm>
