@@ -15,6 +15,7 @@
 #include "genomics/structures.hpp"
 #include "guidescan.hpp"
 
+
 namespace genomics {
   namespace {
     void off_target_enumerator(match m, std::vector<std::set<match>> &off_targets_bwt) {
@@ -36,7 +37,8 @@ namespace genomics {
                               const enumerate_cmd_options& opts,
                               const kmer& k,
                               std::ostream& output,
-                              std::mutex& output_mtx) {
+                              std::mutex& output_mtx,
+                              bool complete) {
     size_t count = 0;
 
     /* Because of the way inexact searching is implemented (from
@@ -113,12 +115,12 @@ namespace genomics {
     }
 
     if (opts.out_format == "csv") {
-      std::string csv_lines = genomics::get_csv_lines(gi_forward, k, opts.start, off_targets);
+      std::string csv_lines = genomics::get_csv_lines(gi_forward, k, opts.start, opts.max_off_targets, off_targets, complete);
       output_mtx.lock();
       output << csv_lines;
       output_mtx.unlock();
     } else {
-      std::string sam_line = genomics::get_sam_line(gi_forward, k, opts.start, opts.max_off_targets, off_targets);
+      std::string sam_line = genomics::get_sam_line(gi_forward, k, opts.start, opts.max_off_targets, off_targets, complete);
       output_mtx.lock();
       output << sam_line << std::endl;
       output_mtx.unlock();
@@ -135,9 +137,10 @@ namespace genomics {
                                std::ostream& output, std::mutex& output_mtx,
                                std::atomic<uint64_t>& num_kmers_processed,
                                uint64_t kmer_count,
-                               const std::chrono::steady_clock::time_point& begin) {
+                               const std::chrono::steady_clock::time_point& begin,
+                               bool complete) {
     for (auto &kmer : kmers) {
-      process_kmer_to_stream(gi_forward, gi_reverse, opts, kmer, output, output_mtx);
+      process_kmer_to_stream(gi_forward, gi_reverse, opts, kmer, output, output_mtx, complete);
       num_kmers_processed.fetch_add(1);
 
       if (num_kmers_processed % 100 == 0) { 

@@ -16,7 +16,11 @@ namespace genomics {
         std::string dir;
         bool ret = kmers_stream.read_row(out_kmer.id, out_kmer.sequence, out_kmer.pam,
                                          out_kmer.chromosome, out_kmer.position, dir);
-        if (ret) out_kmer.dir = dir == "+" ? genomics::direction::positive : genomics::direction::negative;
+        if (ret) {
+          // Convert 1-indexed position to 0-indexed position
+          out_kmer.position -= 1;
+          out_kmer.dir = dir == "+" ? genomics::direction::positive : genomics::direction::negative;
+        }
         return ret;
     }
 };

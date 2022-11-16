@@ -12,7 +12,7 @@ namespace genomics {
         std::string sequence;
         std::string pam;
         std::string chromosome;
-        uint64_t position;
+        uint64_t position;       // 0-indexed position
         direction dir;
     };
 
@@ -44,8 +44,7 @@ namespace genomics {
 
     typedef std::vector<chromosome> genome_structure;
 
-    coordinates resolve_absolute(const genome_structure& gs, uint64_t absolute_coords);
-    uint64_t    resolve_relative(const genome_structure& gs, coordinates coords);
+    std::tuple<coordinates, std::string> resolve_absolute(const genome_structure& gs, int64_t absolute_coords, const kmer& k);
 };
 
 #endif /* GENOMIC_STRUCTURES_H */

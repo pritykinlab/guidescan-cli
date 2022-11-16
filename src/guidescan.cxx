@@ -43,6 +43,7 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.dna_bulges  = 0;
   opts.start       = false;
   opts.out_format  = "csv";
+  opts.out_mode    = "complete";
   opts.max_off_targets = -1;
 
   opts.start_opt       = build->add_flag("--start", opts.start, "Match PAM at start of kmer instead at end (default).");
@@ -55,6 +56,8 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.threshold_opt   = build->add_option("-t,--threshold", opts.threshold, "Filters gRNAs with off-targets at a distance at or below this threshold", true);
   opts.out_format_opt  = build->add_option("--format", opts.out_format, "File format for output. Choices are ['csv', 'sam'].")
     ->transform(CLI::IsMember({"csv", "sam"}, CLI::ignore_case));
+  opts.out_mode_opt  = build->add_option("--mode", opts.out_mode, "Information to output. Choices are ['succinct', 'complete'].")
+    ->transform(CLI::IsMember({"succinct", "complete"}, CLI::ignore_case));
   opts.kmers_file_opt  = build->add_option("-f,--kmers-file", opts.kmers_file,
                                            "File containing kmers to build gRNA database"
                                            " over, if not specified, will generate the database over all kmers with the given PAM")
@@ -186,10 +189,11 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   spdlog::info("Successfully loaded genome index.");
 
   ofstream output(opts.database_file);
+  bool complete = opts.out_mode == "complete";
   if (opts.out_format == "sam") {
     genomics::write_sam_header(output, gi_forward.gs);
   } else {
-    genomics::write_csv_header(output);
+    genomics::write_csv_header(output, complete);
   }
 
   spdlog::info("Loading kmers.");
@@ -215,7 +219,7 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
     thread t(genomics::process_kmers_to_stream<t_wt, t_sa_dens, t_isa_dens>,
              cref(gi_forward), cref(gi_reverse),
              cref(opts), cref(kmers[i]),
-             ref(output), ref(output_mtx), ref(num_kmers_processed), kmer_count, start_time);
+             ref(output), ref(output_mtx), ref(num_kmers_processed), kmer_count, start_time, complete);
     threads.push_back(move(t));
   }
 
