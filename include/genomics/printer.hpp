@@ -96,7 +96,10 @@ namespace genomics {
     }
 
     float calculate_cfd(std::string sgRNA, std::string sequence, std::string PAM) {
+
+      if (PAM.length() < 3) return 1.0;
       float cfd = 1.0;
+
       for (int i=0; i<sgRNA.length(); i++) {
         char _sgRNA = sgRNA.at(i);
         char _sequence = sequence.at(i);

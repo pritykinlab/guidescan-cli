@@ -166,6 +166,11 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
 
   spdlog::info("Loading genome index at \"{}\".", opts.index_file_prefix);
 
+  std::chrono::steady_clock::time_point _start;
+  std::chrono::steady_clock::time_point _end;
+
+  _start = std::chrono::steady_clock::now();
+
   genomics::genome_structure gs;
   if (!genomics::seq_io::load_from_file(gs, genome_structure_file)) {
     error_log->error("No genome structure file {} located.", genome_structure_file);
@@ -182,11 +187,18 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   if (!load_from_file(reverse_fm_index, reverse_fm_index_file)) {
     error_log->error("No forward index file {} located.", reverse_fm_index_file);
     return 1;
-  }   
+  }
+  _end = std::chrono::steady_clock::now();
+  auto _elapsed = std::chrono::duration_cast<std::chrono::microseconds>(_end - _start).count();
+  spdlog::info("Loaded gs/forward/reverse in {} microseconds.", _elapsed);
 
+  _start = std::chrono::steady_clock::now();
   genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_forward(forward_fm_index, gs);
   genomics::genome_index<t_wt, t_sa_dens, t_isa_dens> gi_reverse(reverse_fm_index, gs);
   spdlog::info("Successfully loaded genome index.");
+  _end = std::chrono::steady_clock::now();
+  _elapsed = std::chrono::duration_cast<std::chrono::microseconds>(_end - _start).count();
+  spdlog::info("Constructed structs in {} microseconds.", _elapsed);
 
   ofstream output(opts.database_file);
   bool complete = opts.out_mode == "complete";
