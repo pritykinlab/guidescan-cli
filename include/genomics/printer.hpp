@@ -12,6 +12,7 @@
 #include <tuple>
 #include <iostream>
 #include <vector>
+#include "json.hpp"
 
 namespace genomics {
   namespace {
@@ -246,6 +247,66 @@ namespace genomics {
     }
 
     return csvlines;
+  }
+
+  template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
+  std::string get_json_lines(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
+                            const kmer& k, bool start,
+                            int64_t max_off_targets,
+                            std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets, bool complete) {
+
+    using json = nlohmann::json;
+
+    size_t genome_length = 0;
+    for (int i = 0; i < gi.gs.size(); i++) {
+      genome_length += gi.gs[i].length;
+    }
+
+    json matches;
+    int matches_enumerated = 0;
+    float cfd_sum = 0.0;
+
+    for (uint64_t d = 0; d < off_targets.size(); d++) {
+      for (int64_t i = 0; i < off_targets[d].size(); i++) {
+        if (max_off_targets > 0 && matches_enumerated >= max_off_targets) return matches;
+
+        const auto& off_target = off_targets[d][i];
+        int64_t off_target_abs_coords = std::get<0>(off_target);
+        match match = std::get<1>(off_target);
+
+        coordinates c;
+        std::string strand;
+        std::string sequence = complement(match.sequence);
+        tie(c, strand) = resolve_absolute(gi.gs, off_target_abs_coords, k);
+
+        if (c.chr.name=="") continue; // Handle sentinel value for boundary conditions
+        cfd_sum += calculate_cfd(k.sequence, sequence, k.pam);
+
+        json m = {
+                {"chr", c.chr.name},
+                {"pos", c.offset},
+                {"strand", strand},
+                {"distance", i}
+        };
+
+        if (complete) {
+          m["sequence"] = sequence;
+          m["dna_bulges"] = match.dna_bulges;
+          m["rna_bulges"] = match.rna_bulges;
+        }
+
+        matches_enumerated++;
+        matches.push_back(m);
+      }
+    }
+
+    float specificity = 0.0;
+    if (cfd_sum > 0) specificity = 1/cfd_sum;
+    for (auto& m: matches) {
+      m["specificity"] = specificity;
+    }
+
+    return matches.dump();
   }
 
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>

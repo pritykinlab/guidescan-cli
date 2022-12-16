@@ -119,10 +119,15 @@ namespace genomics {
       output_mtx.lock();
       output << csv_lines;
       output_mtx.unlock();
-    } else {
+    } else if (opts.out_format == "sam") {
       std::string sam_line = genomics::get_sam_line(gi_forward, k, opts.start, opts.max_off_targets, off_targets, complete);
       output_mtx.lock();
       output << sam_line << std::endl;
+      output_mtx.unlock();
+    } else {
+      std::string json_lines = genomics::get_json_lines(gi_forward, k, opts.start, opts.max_off_targets, off_targets, complete);
+      output_mtx.lock();
+      output << json_lines << std::endl;
       output_mtx.unlock();
     }
   }

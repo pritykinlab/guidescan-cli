@@ -54,8 +54,8 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.mismatches_opt  = build->add_option("--rna-bulges", opts.rna_bulges, "Max number of RNA bulges to allow when finding off-targets", true);
   opts.mismatches_opt  = build->add_option("--dna-bulges", opts.dna_bulges, "Number of DNA bulges to allow when finding off-targets", true);
   opts.threshold_opt   = build->add_option("-t,--threshold", opts.threshold, "Filters gRNAs with off-targets at a distance at or below this threshold", true);
-  opts.out_format_opt  = build->add_option("--format", opts.out_format, "File format for output. Choices are ['csv', 'sam'].")
-    ->transform(CLI::IsMember({"csv", "sam"}, CLI::ignore_case));
+  opts.out_format_opt  = build->add_option("--format", opts.out_format, "File format for output. Choices are ['csv', 'sam', 'json'].")
+    ->transform(CLI::IsMember({"csv", "sam", "json"}, CLI::ignore_case));
   opts.out_mode_opt  = build->add_option("--mode", opts.out_mode, "Information to output. Choices are ['succinct', 'complete'].")
     ->transform(CLI::IsMember({"succinct", "complete"}, CLI::ignore_case));
   opts.kmers_file_opt  = build->add_option("-f,--kmers-file", opts.kmers_file,
@@ -204,8 +204,10 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   bool complete = opts.out_mode == "complete";
   if (opts.out_format == "sam") {
     genomics::write_sam_header(output, gi_forward.gs);
-  } else {
+  } else if (opts.out_format == "csv") {
     genomics::write_csv_header(output, complete);
+  } else if (opts.out_format == "json") {
+    output << "[" << std::endl;
   }
 
   spdlog::info("Loading kmers.");
@@ -237,6 +239,10 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
 
   for (auto &thread : threads) {
     thread.join();
+  }
+
+  if (opts.out_format == "json") {
+    output << "]" << std::endl;
   }
 
   std::chrono::steady_clock::time_point end_time = std::chrono::steady_clock::now();
