@@ -4,13 +4,16 @@ add_executable(guidescan guidescan.cxx
   genomics/structures.cxx
   genomics/sequences.cxx )
 
+find_package(CURL REQUIRED)
+
 target_include_directories(guidescan PUBLIC 
   "${CMAKE_SOURCE_DIR}/include"
   "${PROJECT_BINARY_DIR}/sdsl/include"
-  "${PROJECT_BINARY_DIR}/sdsl/external/libdivsufsort/include")
+  "${PROJECT_BINARY_DIR}/sdsl/external/libdivsufsort/include"
+  "${CURL_INCLUDE_DIR}")
 
 # What if pthread isn't found? Find alternatives...
-target_link_libraries(guidescan PUBLIC sdsl divsufsort divsufsort64 pthread)
+target_link_libraries(guidescan PUBLIC sdsl divsufsort divsufsort64 pthread ${CURL_LIBRARIES})
 
 # Static linking trick comes from here:
 # https://stackoverflow.com/questions/35116327/when-g-static-link-pthread-cause-segmentation-fault-why

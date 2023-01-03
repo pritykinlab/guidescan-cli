@@ -3,7 +3,9 @@
 #include <memory>
 #include <atomic>
 #include <chrono>
-
+#include <curl/curl.h>
+#include <json.hpp>
+#include <filesystem>
 #include <sdsl/suffix_arrays.hpp>
 
 #include "spdlog/spdlog.h"
@@ -68,6 +70,22 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.database_file_opt = build->add_option("-o, --output", opts.database_file, "Output file.")
     ->required();
   
+  return build;
+}
+
+CLI::App* download_cmd(CLI::App &guidescan, download_cmd_options& opts) {
+  auto build  = guidescan.add_subcommand("download", "Downloads a genomic index over http.");
+
+  opts.api_url = "http://localhost:8000/download";
+  opts.type = "indices";
+  opts.organism = "";
+  opts.output_directory = ".";
+
+  opts.api_url_opt = build->add_option("--api-url", opts.api_url, "Endpoint for Guidescan Download API", true);
+  opts.type_opt = build->add_option("--type", opts.type, "Download Type: indices (default), database", true);
+  opts.organism_opt = build->add_option("--organism", opts.organism, "Organism", false)->required();
+  opts.output_directory_opt = build->add_option("--output-directory", opts.output_directory, "Output Directory", true)
+          ->check(CLI::ExistingDirectory);
   return build;
 }
 
@@ -234,6 +252,87 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   return 0;
 }
 
+size_t write_stream(void *ptr, size_t size, size_t nmemb, std::ofstream *stream) {
+  stream->write((char*)ptr, size * nmemb);
+  return size * nmemb;
+}
+
+size_t write_string(void *ptr, size_t size, size_t nmemb, std::string *data) {
+  data->append((char*)ptr, size * nmemb);
+  return size * nmemb;
+}
+
+int download_file(std::string url, std::string outfilename) {
+
+  CURL *curl;
+  CURLcode res;
+  std::ofstream outfile;
+
+  curl = curl_easy_init();
+  if (curl) {
+    outfile.open(outfilename, std::ios::binary);
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_stream);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outfile);
+
+    res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    outfile.close();
+  }
+}
+
+int do_download_cmd(const download_cmd_options& opts) {
+
+  const auto& error_log = spdlog::get("error");
+  CURL *curl;
+  CURLcode res;
+
+  std::string json_data;
+
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, opts.api_url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_string);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &json_data);
+
+    res = curl_easy_perform(curl);
+
+    curl_easy_cleanup(curl);
+  }
+
+  using json = nlohmann::json;
+  using path = std::filesystem::path;
+
+  json json_doc = json::parse(json_data);
+  if (json_doc.contains(opts.type)) {
+    auto type = json_doc[opts.type];
+    if (type.count(opts.organism) > 0) {
+      std::string fileurl = type[opts.organism]["url"];
+      path filepath = path(opts.output_directory) / path(fileurl).filename();
+      download_file(fileurl, filepath);
+    } else {
+      std::string supported_options = "";
+      for (auto& el : type.items())
+      {
+        supported_options.append(" " + el.key());
+      }
+      error_log->error("Unrecognized option. Supported options are:" + supported_options);
+      return 1;
+    }
+  } else {
+    std::string supported_types = "";
+    for (auto& el : json_doc.items())
+    {
+      supported_types.append(" " + el.key());
+    }
+    error_log->error("Unrecognized type option. Supported types are:" + supported_types);
+    return 1;
+  }
+
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   CLI::App guidescan("Guidescan all-in-one interface.\n");
@@ -249,11 +348,13 @@ int main(int argc, char *argv[])
 
   enumerate_cmd_options enumerate_opts;
   index_cmd_options index_opts;
+  download_cmd_options download_opts;
 
   auto enumerate = enumerate_cmd(guidescan, enumerate_opts);
   auto index = index_cmd(guidescan, index_opts);
+  auto download = download_cmd(guidescan, download_opts);
 
-  (void) enumerate; (void) index;; // supress unused variable warnings
+  (void) enumerate; (void) index;; // suppress unused variable warnings
 
   try {
     guidescan.parse(argc, argv);
@@ -267,6 +368,10 @@ int main(int argc, char *argv[])
 
   if (guidescan.got_subcommand("enumerate")) {
     return do_enumerate_cmd(enumerate_opts);
+  }
+
+  if (guidescan.got_subcommand("download")) {
+    return do_download_cmd(download_opts);
   }
 
   return 1;
