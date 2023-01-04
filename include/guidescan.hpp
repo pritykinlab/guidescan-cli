@@ -53,17 +53,20 @@ struct enumerate_cmd_options {
 };
 
 struct download_cmd_options {
-    std::string api_url;
-    CLI::Option* api_url_opt = nullptr;
+    std::string download_url;
+    CLI::Option* download_url_opt = nullptr;
 
     std::string type;
     CLI::Option* type_opt = nullptr;
 
-    std::string organism;
-    CLI::Option* organism_opt = nullptr;
+    std::string item;
+    CLI::Option* item_opt = nullptr;
 
     std::string output_directory;
     CLI::Option* output_directory_opt = nullptr;
+
+    std::string show;
+    CLI::Option* show_opt = nullptr;
 };
 
 #endif

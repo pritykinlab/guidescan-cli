@@ -2,7 +2,8 @@ add_executable(guidescan guidescan.cxx
   genomics/seq_io.cxx
   genomics/kmer.cxx
   genomics/structures.cxx
-  genomics/sequences.cxx )
+  genomics/sequences.cxx
+  io/curl.cxx)
 
 find_package(CURL REQUIRED)
 

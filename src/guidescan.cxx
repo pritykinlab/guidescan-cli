@@ -1,9 +1,7 @@
 #include <thread>
 #include <istream>
-#include <memory>
 #include <atomic>
 #include <chrono>
-#include <curl/curl.h>
 #include <json.hpp>
 #include <filesystem>
 #include <sdsl/suffix_arrays.hpp>
@@ -16,8 +14,12 @@
 #include "genomics/seq_io.hpp"
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"
+#include "io/curl.hpp"
 #include "guidescan.hpp"
 #include "version.hpp"
+
+using json = nlohmann::json;
+using path = std::filesystem::path;
 
 #define t_sa_dens 64
 #define t_isa_dens 8192
@@ -74,18 +76,21 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
 }
 
 CLI::App* download_cmd(CLI::App &guidescan, download_cmd_options& opts) {
-  auto build  = guidescan.add_subcommand("download", "Downloads a genomic index over http.");
+  auto build  = guidescan.add_subcommand("download", "Downloads GuideScan data over HTTP.");
 
-  opts.api_url = "http://localhost:8000/download";
-  opts.type = "indices";
-  opts.organism = "";
+  opts.download_url = "http://localhost:8000/download";
+  opts.type = "";
+  opts.item = "";
   opts.output_directory = ".";
+  opts.show = "";
 
-  opts.api_url_opt = build->add_option("--api-url", opts.api_url, "Endpoint for Guidescan Download API", true);
-  opts.type_opt = build->add_option("--type", opts.type, "Download Type: indices (default), database", true);
-  opts.organism_opt = build->add_option("--organism", opts.organism, "Organism", false)->required();
+  opts.download_url_opt = build->add_option("--download-url", opts.download_url, "Endpoint for Download API", true);
+  opts.type_opt = build->add_option("--type", opts.type, "Download Type", true);
+  opts.item_opt = build->add_option("--item", opts.item, "Download Item", true);
   opts.output_directory_opt = build->add_option("--output-directory", opts.output_directory, "Output Directory", true)
           ->check(CLI::ExistingDirectory);
+  opts.show_opt = build->add_option("--show", opts.show, "Show Options for type or item", true)
+          ->transform(CLI::IsMember({"type", "item"}, CLI::ignore_case));
   return build;
 }
 
@@ -252,84 +257,41 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   return 0;
 }
 
-size_t write_stream(void *ptr, size_t size, size_t nmemb, std::ofstream *stream) {
-  stream->write((char*)ptr, size * nmemb);
-  return size * nmemb;
-}
-
-size_t write_string(void *ptr, size_t size, size_t nmemb, std::string *data) {
-  data->append((char*)ptr, size * nmemb);
-  return size * nmemb;
-}
-
-int download_file(std::string url, std::string outfilename) {
-
-  CURL *curl;
-  CURLcode res;
-  std::ofstream outfile;
-
-  curl = curl_easy_init();
-  if (curl) {
-    outfile.open(outfilename, std::ios::binary);
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_stream);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outfile);
-
-    res = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    outfile.close();
-  }
-}
-
 int do_download_cmd(const download_cmd_options& opts) {
 
-  const auto& error_log = spdlog::get("error");
-  CURL *curl;
-  CURLcode res;
+  json json_doc = io::download_json(opts.download_url);
 
-  std::string json_data;
-
-  curl = curl_easy_init();
-  if(curl) {
-    curl_easy_setopt(curl, CURLOPT_URL, opts.api_url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_string);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &json_data);
-
-    res = curl_easy_perform(curl);
-
-    curl_easy_cleanup(curl);
+  if (opts.show == "type") {
+    std::string supported_types = "";
+    for (auto& el : json_doc.items()) supported_types.append(" " + el.key());
+    std::cout << "Supported types are:" + supported_types << std::endl;
+    return 0;
+  } else if (opts.show == "item") {
+    if (opts.type == "") {
+      std::cout << "Specify a valid type using the --type flag." << std::endl;
+      return 1;
+    } else {
+      std::string supported_items = "";
+      for (auto& el : json_doc[opts.type].items()) supported_items.append(" " + el.key());
+      std::cout << "Supported items are:" + supported_items << std::endl;
+      return 0;
+    }
   }
 
-  using json = nlohmann::json;
-  using path = std::filesystem::path;
-
-  json json_doc = json::parse(json_data);
   if (json_doc.contains(opts.type)) {
     auto type = json_doc[opts.type];
-    if (type.count(opts.organism) > 0) {
-      std::string fileurl = type[opts.organism]["url"];
+    if (type.count(opts.item) > 0) {
+      std::string fileurl = type[opts.item]["url"];
       path filepath = path(opts.output_directory) / path(fileurl).filename();
-      download_file(fileurl, filepath);
+      io::download_file(fileurl, filepath);
     } else {
-      std::string supported_options = "";
-      for (auto& el : type.items())
-      {
-        supported_options.append(" " + el.key());
-      }
-      error_log->error("Unrecognized option. Supported options are:" + supported_options);
+      std::cout << "Unrecognized item. Specify the item using --item or use \"--show item\" to see available items." << std::endl;
       return 1;
     }
   } else {
-    std::string supported_types = "";
-    for (auto& el : json_doc.items())
-    {
-      supported_types.append(" " + el.key());
-    }
-    error_log->error("Unrecognized type option. Supported types are:" + supported_types);
+    std::cout << "Unrecognized type. Specify the type using --type or use \"--show type\" to see available items." << std::endl;
     return 1;
   }
-
   return 0;
 }
 
