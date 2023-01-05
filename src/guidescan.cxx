@@ -259,21 +259,39 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
 
 int do_download_cmd(const download_cmd_options& opts) {
 
-  json json_doc = io::download_json(opts.download_url);
+  json json_doc;
+  int status = io::download_json(opts.download_url, json_doc);
+  if (status) return status;
 
   if (opts.show == "type") {
-    std::string supported_types = "";
-    for (auto& el : json_doc.items()) supported_types.append(" " + el.key());
-    std::cout << "Supported types are:" + supported_types << std::endl;
+    std::string msg = "";
+    for (auto& [key, value] : json_doc.items()) {
+      msg += " " + key;
+    }
+    std::cout << "Supported types are:" + msg;
     return 0;
   } else if (opts.show == "item") {
     if (opts.type == "") {
       std::cout << "Specify a valid type using the --type flag." << std::endl;
       return 1;
     } else {
-      std::string supported_items = "";
-      for (auto& el : json_doc[opts.type].items()) supported_items.append(" " + el.key());
-      std::cout << "Supported items are:" + supported_items << std::endl;
+      std::string msg = "";
+      for (auto& [key, value] : json_doc[opts.type].items()) {
+        msg.append("\n  " + key);
+        if (value.contains("desc")) {
+          msg += " (" + value["desc"].get<std::string>() + ")";
+        }
+        std::string extra = "";
+        for (auto& [k, v] : value.items()) {
+          if ((k != "url") && (k != "desc")) {
+            extra += k + "=" + v.get<std::string>() + " ";
+          }
+        }
+        if (extra != "") {
+          msg += " [ " + extra + "]";
+        }
+      }
+      std::cout << "Supported items are:" + msg << std::endl;
       return 0;
     }
   }

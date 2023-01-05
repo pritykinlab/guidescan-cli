@@ -50,28 +50,29 @@ namespace io {
       }
     }
 
-    json download_json(std::string url) {
+    int download_json(std::string url, json& json_data) {
 
       CURL *curl;
       CURLcode res;
 
-      std::string json_data;
+      std::string json_string;
 
       curl = curl_easy_init();
       if (curl) {
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_string);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &json_data);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &json_string);
 
         res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
       }
 
-      if ((res != CURLE_OK) || (json_data == "")) {
-        std::cout << "Default server unreachable. You may want to specify the --download-url option." << std::endl;
+      if ((res != CURLE_OK) || (json_string == "")) {
+        std::cout << "Server unreachable. You may want to specify the --download-url option." << std::endl;
         return res;
       }
 
-      return json::parse(json_data);
+      json_data = json::parse(json_string);
+      return 0;
     }
 }
