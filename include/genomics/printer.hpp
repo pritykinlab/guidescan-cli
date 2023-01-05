@@ -243,9 +243,6 @@ namespace genomics {
     float specificity = 0.0;
     if (!perfect_match) cfd_sum += 1;
     if (cfd_sum > 0) specificity = 1/cfd_sum;
-    if ((specificity < 0) || (specificity > 1)) {
-      throw std::invalid_argument("nooo");
-    }
     for (auto line: off_targets_lines) {
       csvlines += line + "," + std::to_string(specificity) + "\n";
     }
