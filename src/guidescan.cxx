@@ -1,9 +1,9 @@
 #include <thread>
 #include <istream>
-#include <memory>
 #include <atomic>
 #include <chrono>
-
+#include <json.hpp>
+#include <filesystem>
 #include <sdsl/suffix_arrays.hpp>
 
 #include "spdlog/spdlog.h"
@@ -14,8 +14,12 @@
 #include "genomics/seq_io.hpp"
 #include "genomics/process.hpp"
 #include "genomics/kmer.hpp"
+#include "io/curl.hpp"
 #include "guidescan.hpp"
 #include "version.hpp"
+
+using json = nlohmann::json;
+using path = std::filesystem::path;
 
 #define t_sa_dens 64
 #define t_isa_dens 8192
@@ -68,6 +72,25 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
   opts.database_file_opt = build->add_option("-o, --output", opts.database_file, "Output file.")
     ->required();
   
+  return build;
+}
+
+CLI::App* download_cmd(CLI::App &guidescan, download_cmd_options& opts) {
+  auto build  = guidescan.add_subcommand("download", "Downloads GuideScan data over HTTP.");
+
+  opts.download_url = "http://guidescan.com:8000/download";
+  opts.type = "";
+  opts.item = "";
+  opts.output_directory = ".";
+  opts.show = "";
+
+  opts.download_url_opt = build->add_option("--download-url", opts.download_url, "Endpoint for Download API", true);
+  opts.type_opt = build->add_option("--type", opts.type, "Download Type", true);
+  opts.item_opt = build->add_option("--item", opts.item, "Download Item", true);
+  opts.output_directory_opt = build->add_option("--output-directory", opts.output_directory, "Output Directory", true)
+          ->check(CLI::ExistingDirectory);
+  opts.show_opt = build->add_option("--show", opts.show, "Show Options for type or item", true)
+          ->transform(CLI::IsMember({"type", "item"}, CLI::ignore_case));
   return build;
 }
 
@@ -234,6 +257,62 @@ int do_enumerate_cmd(const enumerate_cmd_options& opts) {
   return 0;
 }
 
+int do_download_cmd(const download_cmd_options& opts) {
+
+  json json_doc;
+  int status = io::download_json(opts.download_url, json_doc);
+  if (status) return status;
+
+  if (opts.show == "type") {
+    std::string msg = "";
+    for (auto& [key, value] : json_doc.items()) {
+      msg += " " + key;
+    }
+    std::cout << "Supported types are:" + msg << std::endl;
+    return 0;
+  } else if (opts.show == "item") {
+    if (opts.type == "") {
+      std::cout << "Specify a valid type using the --type flag." << std::endl;
+      return 1;
+    } else {
+      std::string msg = "";
+      for (auto& [key, value] : json_doc[opts.type].items()) {
+        msg.append("\n  " + key);
+        if (value.contains("desc")) {
+          msg += " (" + value["desc"].get<std::string>() + ")";
+        }
+        std::string extra = "";
+        for (auto& [k, v] : value.items()) {
+          if ((k != "url") && (k != "desc")) {
+            extra += k + "=" + v.get<std::string>() + " ";
+          }
+        }
+        if (extra != "") {
+          msg += " [ " + extra + "]";
+        }
+      }
+      std::cout << "Supported items are:" + msg << std::endl;
+      return 0;
+    }
+  }
+
+  if (json_doc.contains(opts.type)) {
+    auto type = json_doc[opts.type];
+    if (type.count(opts.item) > 0) {
+      std::string fileurl = type[opts.item]["url"];
+      path filepath = path(opts.output_directory) / path(fileurl).filename();
+      io::download_file(fileurl, filepath);
+    } else {
+      std::cout << "Unrecognized item. Specify the item using --item or use \"--show item\" to see available items." << std::endl;
+      return 1;
+    }
+  } else {
+    std::cout << "Unrecognized type. Specify the type using --type or use \"--show type\" to see available types." << std::endl;
+    return 1;
+  }
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   CLI::App guidescan("Guidescan all-in-one interface.\n");
@@ -249,11 +328,13 @@ int main(int argc, char *argv[])
 
   enumerate_cmd_options enumerate_opts;
   index_cmd_options index_opts;
+  download_cmd_options download_opts;
 
   auto enumerate = enumerate_cmd(guidescan, enumerate_opts);
   auto index = index_cmd(guidescan, index_opts);
+  auto download = download_cmd(guidescan, download_opts);
 
-  (void) enumerate; (void) index;; // supress unused variable warnings
+  (void) enumerate; (void) index;; // suppress unused variable warnings
 
   try {
     guidescan.parse(argc, argv);
@@ -267,6 +348,10 @@ int main(int argc, char *argv[])
 
   if (guidescan.got_subcommand("enumerate")) {
     return do_enumerate_cmd(enumerate_opts);
+  }
+
+  if (guidescan.got_subcommand("download")) {
+    return do_download_cmd(download_opts);
   }
 
   return 1;

@@ -96,6 +96,8 @@ namespace genomics {
     }
 
     float calculate_cfd(std::string sgRNA, std::string sequence, std::string PAM) {
+      if (PAM.length() != 3) return 1.0; // CFD only defined for length 3 PAMs.
+
       float cfd = 1.0;
       for (int i=0; i<sgRNA.length(); i++) {
         char _sgRNA = sgRNA.at(i);
@@ -220,6 +222,7 @@ namespace genomics {
     std::string csvlines;
 
     float cfd_sum = 0.0;
+    bool perfect_match = false;
     std::vector<std::string> off_targets_lines;
     for (uint64_t d = 0; d < off_targets.size(); d++) {
       for (int64_t i = 0; i < off_targets[d].size(); i++) {
@@ -227,6 +230,7 @@ namespace genomics {
         const auto& off_target = off_targets[d][i];
         int64_t off_target_abs_coords = std::get<0>(off_target);
         match match = std::get<1>(off_target);
+        perfect_match = match.mismatches == 0;
         std::string csvline = get_csv_line(gi, k, start, match, off_target_abs_coords, complete);
         if (csvline != "") {
           off_targets_lines.push_back(csvline);
@@ -237,6 +241,7 @@ namespace genomics {
 
     // Each off-target will have the same specificity value - add at the end of each line
     float specificity = 0.0;
+    if (!perfect_match) cfd_sum += 1;
     if (cfd_sum > 0) specificity = 1/cfd_sum;
     for (auto line: off_targets_lines) {
       csvlines += line + "," + std::to_string(specificity) + "\n";
