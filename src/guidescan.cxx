@@ -307,7 +307,7 @@ int do_download_cmd(const download_cmd_options& opts) {
       return 1;
     }
   } else {
-    std::cout << "Unrecognized type. Specify the type using --type or use \"--show type\" to see available items." << std::endl;
+    std::cout << "Unrecognized type. Specify the type using --type or use \"--show type\" to see available types." << std::endl;
     return 1;
   }
   return 0;
