@@ -268,7 +268,7 @@ int do_download_cmd(const download_cmd_options& opts) {
     for (auto& [key, value] : json_doc.items()) {
       msg += " " + key;
     }
-    std::cout << "Supported types are:" + msg;
+    std::cout << "Supported types are:" + msg << std::endl;
     return 0;
   } else if (opts.show == "item") {
     if (opts.type == "") {
