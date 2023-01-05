@@ -78,7 +78,7 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
 CLI::App* download_cmd(CLI::App &guidescan, download_cmd_options& opts) {
   auto build  = guidescan.add_subcommand("download", "Downloads GuideScan data over HTTP.");
 
-  opts.download_url = "http://localhost:8000/download";
+  opts.download_url = "http://guidescan.com:8000/download";
   opts.type = "";
   opts.item = "";
   opts.output_directory = ".";

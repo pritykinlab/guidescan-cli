@@ -67,12 +67,17 @@ namespace io {
         curl_easy_cleanup(curl);
       }
 
-      if ((res != CURLE_OK) || (json_string == "")) {
+      if (res != CURLE_OK) {
         std::cout << "Server unreachable. You may want to specify the --download-url option." << std::endl;
         return res;
       }
 
-      json_data = json::parse(json_string);
+      try {
+        json_data = json::parse(json_string);
+      } catch (json::parse_error& ex) {
+        std::cout << "Server response error. You may want to specify the --download-url option." << std::endl;
+        return 1;
+      }
       return 0;
     }
 }
