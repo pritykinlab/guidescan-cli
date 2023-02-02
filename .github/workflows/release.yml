@@ -29,6 +29,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Setup (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install libcurl4-openssl-dev
+
       - name: Setup Envvars
         run: |
           echo "GUIDESCAN_VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
