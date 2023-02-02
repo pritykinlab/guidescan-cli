@@ -32,11 +32,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Setup (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install libcurl4-openssl-dev
+
       - name: Build
         run: |
           cmake -G "${{ matrix.cmake_generator }}" -S . -B build
           cmake --build build
 
-      - name: Guidescan run
+      - name: Guidescan version
         run: |
-          ./build/bin/guidescan
+          ./build/bin/guidescan --version
