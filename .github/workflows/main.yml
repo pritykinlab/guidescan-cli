@@ -1,0 +1,42 @@
+name: Main
+
+on:
+  push:
+    branches: [ master, develop** ]
+    tags:
+      - '*'
+  pull_request:
+    branches: [ master, develop** ]
+
+jobs:
+
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+        include:
+          - os: ubuntu-latest
+            cmake_generator: "Unix Makefiles"
+          - os: macos-latest
+            cmake_generator: "Unix Makefiles"
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build
+        run: |
+          cmake -G "${{ matrix.cmake_generator }}" -S . -B build
+          cmake --build build
+
+      - name: Guidescan run
+        run: |
+          ./build/bin/guidescan
