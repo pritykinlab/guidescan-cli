@@ -41,7 +41,7 @@ CLI::App* enumerate_cmd(CLI::App &guidescan, enumerate_cmd_options& opts) {
 
   opts.nthreads    = std::thread::hardware_concurrency();
   opts.alt_pams    = {};
-  opts.threshold   = 1;
+  opts.threshold   = -1;
   opts.mismatches  = 3;
   opts.rna_bulges  = 0;
   opts.dna_bulges  = 0;
