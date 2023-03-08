@@ -29,7 +29,7 @@ def parse_arguments():
         "--min-chr-length",
         help="Minimum chromosome length to consider for kmer generation.",
         type=int,
-        default=10_000
+        default=0
     )
 
     parser.add_argument(
@@ -105,10 +105,14 @@ def find_all_kmers(pam, k, chrm, end=True):
 
     for p in pam_set:
         for kmer, pos in find_kmers(p, k, chrm, end=end):
+            if len(kmer) != k: continue
+            if not all(nuc in NUCS for nuc in kmer): continue
             yield {"sequence" : kmer, "position" : pos, "pam" : pam, "sense": "+"}
 
     for p in rev_pam_set:
         for kmer, pos in find_kmers(p, k, chrm, forward=False, end=end):
+            if len(kmer) != k: continue
+            if not all(nuc in NUCS for nuc in kmer): continue
             yield {"sequence" : revcom(kmer), "position" : pos,
                    "pam" : pam, "sense": "-"}
 
