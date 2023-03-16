@@ -119,17 +119,20 @@ namespace genomics {
       uint64_t delim = get_delim(gs);
       std::string offtarget_hex("");
       float cfd_sum = 0.0;
+      bool perfect_match = false;
 
       for (uint64_t i = 0; i < off_targets.size(); i++) {
           std::list<int64_t> v;
 
-          std::shuffle(off_targets[i].begin(), off_targets[i].end(), std::mt19937{std::random_device{}()});
           int64_t n_off_targets = 0;
           for (const auto& t : off_targets[i]) {
               if ((max_off_targets != -1) && (n_off_targets >= max_off_targets))
                   break;
               auto pos = std::get<0>(t);
               auto match = std::get<1>(t);
+
+              if (match.mismatches == 0)
+                perfect_match = true;
 
               coordinates c;
               std::string strand;
@@ -149,6 +152,7 @@ namespace genomics {
       }
 
       float specificity = 0.0;
+      if (!perfect_match) cfd_sum += 1;
       if (cfd_sum > 0) specificity = 1/cfd_sum;
 
       return std::make_tuple(offtarget_hex, specificity);
@@ -230,7 +234,8 @@ namespace genomics {
         const auto& off_target = off_targets[d][i];
         int64_t off_target_abs_coords = std::get<0>(off_target);
         match match = std::get<1>(off_target);
-        perfect_match = match.mismatches == 0;
+        if (match.mismatches == 0)
+          perfect_match = true;
         std::string csvline = get_csv_line(gi, k, start, match, off_target_abs_coords, complete);
         if (csvline != "") {
           off_targets_lines.push_back(csvline);
