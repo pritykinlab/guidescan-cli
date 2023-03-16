@@ -56,7 +56,7 @@ def map_coord_to_sequence(fasta_record_dict, sgrna, chr, pos, strand):
     else:
         pos_start = pos
         pos_end = pos + len(sgrna)
-    return fasta_record_dict[chr].seq[pos_start:pos_end].upper()
+    return str(fasta_record_dict[chr].seq[pos_start:pos_end].upper()), pos_start, pos_end
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -118,10 +118,12 @@ def decode_off_targets(sam_record, genome, delim, fasta_record_dict):
         if sam_record.is_reverse:
             sgrna = revcom(sgrna)
 
-        offtarget = str(map_coord_to_sequence(fasta_record_dict, sgrna, chrm, pos, strand))
+        # Note - offtarget_pos_start is always the lower in value of {offtarget_pos_start, offtarget_pos_end},
+        # regardless of strand
+        offtarget, offtarget_pos_start, offtarget_pos_end = map_coord_to_sequence(fasta_record_dict, sgrna, chrm, pos, strand)
 
         if len(offtarget) == 23:
-            seq = revcom(offtarget) if strand == '-' else offtarget 
+            seq = revcom(offtarget) if strand == '-' else offtarget
             cfd = calc_cfd(sgrna, seq[:20], seq[21:23])
         else:
             cfd = None
@@ -130,7 +132,9 @@ def decode_off_targets(sam_record, genome, delim, fasta_record_dict):
             "identifier": sam_record.query_name,
             "distance": distance,
             "chr": chrm,
-            "pos": pos,
+            # 0-based indexing is used by pysam and inside this script;
+            # For reporting, purposes, switch to 1-based indexing to avoid confusion with samtools interoperability
+            "pos": offtarget_pos_start + 1,
             "sense": strand,
             "offtarget": revcom(offtarget) if strand == '-' else offtarget,
             "cfd": cfd
