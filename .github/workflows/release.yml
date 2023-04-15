@@ -71,4 +71,4 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         uses: softprops/action-gh-release@v1
         with:
-          files: osqp-${{env.GUIDESCAN_VERSION}}-src.tar.gz
+          files: guidescan-${{env.GUIDESCAN_VERSION}}-src.tar.gz
