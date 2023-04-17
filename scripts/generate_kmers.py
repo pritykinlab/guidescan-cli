@@ -100,6 +100,7 @@ def find_kmers(pam, k, chrm, forward=True, end=True):
         yield kmer.upper(), position+1
 
 def find_all_kmers(pam, k, chrm, end=True):
+    chrm = str(chrm).upper()
     pam_set = generate_pam_set(pam)
     rev_pam_set = list(map(revcom, pam_set))
 
