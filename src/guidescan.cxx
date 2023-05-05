@@ -3,7 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <json.hpp>
-#include <filesystem>
+#include <experimental/filesystem>
 #include <sdsl/suffix_arrays.hpp>
 
 #include "spdlog/spdlog.h"
@@ -19,7 +19,7 @@
 #include "version.hpp"
 
 using json = nlohmann::json;
-using path = std::filesystem::path;
+using path = std::experimental::filesystem::path;
 
 #define t_sa_dens 64
 #define t_isa_dens 8192

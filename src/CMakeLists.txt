@@ -14,7 +14,7 @@ target_include_directories(guidescan PUBLIC
   "${CURL_INCLUDE_DIR}")
 
 # What if pthread isn't found? Find alternatives...
-target_link_libraries(guidescan PUBLIC sdsl divsufsort divsufsort64 pthread ${CURL_LIBRARIES})
+target_link_libraries(guidescan PUBLIC sdsl divsufsort divsufsort64 pthread ${CURL_LIBRARIES} stdc++fs)
 
 # Static linking trick comes from here:
 # https://stackoverflow.com/questions/35116327/when-g-static-link-pthread-cause-segmentation-fault-why

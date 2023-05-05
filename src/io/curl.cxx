@@ -1,11 +1,12 @@
 #include <curl/curl.h>
 #include <json.hpp>
+#include <experimental/filesystem>
 
 #include "guidescan.hpp"
 #include "io/curl.hpp"
 
 using json = nlohmann::json;
-using path = std::filesystem::path;
+using path = std::experimental::filesystem::path;
 
 
 namespace io {
