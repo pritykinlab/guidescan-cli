@@ -140,7 +140,13 @@ namespace genomics {
               if (c.chr.name == "") continue;
               v.push_back(pos);
 
-              cfd_sum += calculate_cfd(k.sequence, complement(match.sequence), k.pam);
+              auto match_sequence = complement(match.sequence);
+              // Note that we cannot simply take k.pam as the PAM
+              // because the match may well have been found using
+              // an alternate PAM. The relevant PAM to consider for
+              // CFD calculations is found at the end of the match.
+              auto pam = match_sequence.substr(20, 3);
+              cfd_sum += calculate_cfd(k.sequence, match_sequence, pam);
 
               n_off_targets++;
           }
