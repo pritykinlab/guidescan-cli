@@ -245,7 +245,12 @@ namespace genomics {
         std::string csvline = get_csv_line(gi, k, start, match, off_target_abs_coords, complete);
         if (csvline != "") {
           off_targets_lines.push_back(csvline);
-          cfd_sum += calculate_cfd(k.sequence, complement(match.sequence), k.pam);
+          auto match_sequence = complement(match.sequence);
+          // Note that we cannot simply take k.pam as the PAM
+          // because the match may well have been found using
+          // an alternate PAM. The relevant PAM to consider for
+          // CFD calculations is found at the end of the match.
+          cfd_sum += calculate_cfd(k.sequence, match_sequence, match_sequence.substr(20, 3));
         }
       }
     }
