@@ -130,8 +130,14 @@ namespace genomics {
                   break;
               auto pos = std::get<0>(t);
               auto match = std::get<1>(t);
+              std::string match_sequence = complement(match.sequence);
+              // Note that we cannot simply take k.pam as the PAM
+              // because the match may well have been found using
+              // an alternate PAM. The relevant PAM to consider for
+              // CFD calculations is found at the end of the match.
+              std::string pam = match_sequence.substr(20, 3);
 
-              if (match.mismatches == 0)
+              if ((match.mismatches == 0) && (pam.substr(1, 2) == "GG"))
                 perfect_match = true;
 
               coordinates c;
@@ -140,12 +146,6 @@ namespace genomics {
               if (c.chr.name == "") continue;
               v.push_back(pos);
 
-              auto match_sequence = complement(match.sequence);
-              // Note that we cannot simply take k.pam as the PAM
-              // because the match may well have been found using
-              // an alternate PAM. The relevant PAM to consider for
-              // CFD calculations is found at the end of the match.
-              auto pam = match_sequence.substr(20, 3);
               cfd_sum += calculate_cfd(k.sequence, match_sequence, pam);
 
               n_off_targets++;
@@ -180,6 +180,17 @@ namespace genomics {
     }
     os << ",specificity" << std::endl;
   }
+
+    template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
+    std::string get_csv_line_nomatch(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
+                             const kmer& k, bool start, bool complete) {
+
+      std::string csvline(k.id);
+      std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
+      csvline += "," + sequence + ",NA,NA,NA,0,1.0";  // sequence, chrom, pos, strand, distance, specificity
+      if (complete) csvline += ",NA,NA,NA";  // match sequence, rna bulges, dna bulges;
+      return csvline;
+    }
 
   template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
   std::string get_csv_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
@@ -233,34 +244,45 @@ namespace genomics {
 
     float cfd_sum = 0.0;
     bool perfect_match = false;
+    bool no_match_no_offtargets = true;
     std::vector<std::string> off_targets_lines;
+
     for (uint64_t d = 0; d < off_targets.size(); d++) {
       for (int64_t i = 0; i < off_targets[d].size(); i++) {
+        no_match_no_offtargets = false;
         if ((max_off_targets != -1) && (i >= max_off_targets)) break;
+
         const auto& off_target = off_targets[d][i];
         int64_t off_target_abs_coords = std::get<0>(off_target);
         match match = std::get<1>(off_target);
-        if (match.mismatches == 0)
+        std::string match_sequence = complement(match.sequence);
+        // Note that we cannot simply take k.pam as the PAM
+        // because the match may well have been found using
+        // an alternate PAM. The relevant PAM to consider for
+        // CFD calculations is found at the end of the match.
+        std::string pam = match_sequence.substr(20, 3);
+
+        if ((match.mismatches == 0) && (pam.substr(1, 2) == "GG"))
           perfect_match = true;
+
         std::string csvline = get_csv_line(gi, k, start, match, off_target_abs_coords, complete);
         if (csvline != "") {
           off_targets_lines.push_back(csvline);
-          auto match_sequence = complement(match.sequence);
-          // Note that we cannot simply take k.pam as the PAM
-          // because the match may well have been found using
-          // an alternate PAM. The relevant PAM to consider for
-          // CFD calculations is found at the end of the match.
-          cfd_sum += calculate_cfd(k.sequence, match_sequence, match_sequence.substr(20, 3));
+          cfd_sum += calculate_cfd(k.sequence, match_sequence, pam);
         }
       }
     }
 
-    // Each off-target will have the same specificity value - add at the end of each line
-    float specificity = 0.0;
-    if (!perfect_match) cfd_sum += 1;
-    if (cfd_sum > 0) specificity = 1/cfd_sum;
-    for (auto line: off_targets_lines) {
-      csvlines += line + "," + std::to_string(specificity) + "\n";
+    if (no_match_no_offtargets) {
+      csvlines += get_csv_line_nomatch(gi, k, start, complete) + "\n";
+    } else {
+      // Each off-target will have the same specificity value - add at the end of each line
+      float specificity = 0.0;
+      if (!perfect_match) cfd_sum += 1;
+      if (cfd_sum > 0) specificity = 1 / cfd_sum;
+      for (auto line: off_targets_lines) {
+        csvlines += line + "," + std::to_string(specificity) + "\n";
+      }
     }
 
     return csvlines;
@@ -290,30 +312,20 @@ namespace genomics {
     }
 
     samline += "\t*";                                              // SAM:QUAL
-
-    bool no_off_targets = true;
-    for (const auto& v : off_targets) {
-      if (!v.empty()) {
-          no_off_targets = false;
-          break;
-      }
+    
+    // store off-target counts in tag
+    for (uint64_t k = 0; k < off_targets.size(); k++) {
+        samline += "\tk" + std::to_string(k) + ":i:" + std::to_string(off_targets[k].size());
     }
 
-    if (!no_off_targets) {
-      // store off-target counts in tag
-      for (uint64_t k = 0; k < off_targets.size(); k++) {
-          samline += "\tk" + std::to_string(k) + ":i:" + std::to_string(off_targets[k].size());
-      }
+    std::string offtarget_hex;
+    float specificity;
+    tie(offtarget_hex, specificity) = off_target_fields(k, gi.gs, off_targets, max_off_targets);
 
-      std::string offtarget_hex;
-      float specificity;
-      tie(offtarget_hex, specificity) = off_target_fields(k, gi.gs, off_targets, max_off_targets);
-
-      if (complete) {
-          samline += "\tof:H:" + offtarget_hex;
-      }
-      samline += "\tsp:f:" + std::to_string(specificity);
+    if (complete) {
+        samline += "\tof:H:" + offtarget_hex;
     }
+    samline += "\tsp:f:" + std::to_string(specificity);
 
     return samline;
   }
