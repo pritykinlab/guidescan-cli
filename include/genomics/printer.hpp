@@ -187,8 +187,9 @@ namespace genomics {
 
       std::string csvline(k.id);
       std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
-      csvline += "," + sequence + ",NA,NA,NA,0,1.0";  // sequence, chrom, pos, strand, distance, specificity
-      if (complete) csvline += ",NA,NA,NA";  // match sequence, rna bulges, dna bulges;
+      csvline += "," + sequence + ",NA,NA,NA,0";  // sequence, chrom, pos, strand, distance
+      if (complete) csvline += ",NA,NA,NA";  // match sequence, rna bulges, dna bulges
+      csvline += ",1.0";  // specificity
       return csvline;
     }
 
