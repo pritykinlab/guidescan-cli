@@ -96,7 +96,7 @@ namespace genomics {
     }
 
     float calculate_cfd(std::string sgRNA, std::string sequence, std::string PAM) {
-      if (PAM.length() != 3) return 1.0; // CFD only defined for length 3 PAMs.
+      if ((sgRNA.length() != 20) || (PAM.length() != 3)) return 1.0; // CFD only defined for 20-mer sgRNAs and length 3 PAMs.
 
       float cfd = 1.0;
       for (int i=0; i<sgRNA.length(); i++) {
@@ -135,9 +135,14 @@ namespace genomics {
               // because the match may well have been found using
               // an alternate PAM. The relevant PAM to consider for
               // CFD calculations is found at the end of the match.
-              std::string pam = match_sequence.substr(20, 3);
+              std::string pam;
+              if (match_sequence.length() < 20) {
+                pam = "";
+              } else {
+                pam = match_sequence.substr(20, 3);
+              }
 
-              if ((match.mismatches == 0) && (pam.substr(1, 2) == "GG"))
+              if ((match.mismatches == 0) && (pam.length() == 3) && (pam.substr(1, 2) == "GG"))
                 perfect_match = true;
 
               coordinates c;
@@ -187,8 +192,9 @@ namespace genomics {
 
       std::string csvline(k.id);
       std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
-      csvline += "," + sequence + ",NA,NA,NA,0,1.0";  // sequence, chrom, pos, strand, distance, specificity
-      if (complete) csvline += ",NA,NA,NA";  // match sequence, rna bulges, dna bulges;
+      csvline += "," + sequence + ",NA,NA,NA,0";  // sequence, chrom, pos, strand, distance
+      if (complete) csvline += ",NA,NA,NA";  // match sequence, rna bulges, dna bulges
+      csvline += ",1.0";  // specificity
       return csvline;
     }
 
@@ -260,9 +266,14 @@ namespace genomics {
         // because the match may well have been found using
         // an alternate PAM. The relevant PAM to consider for
         // CFD calculations is found at the end of the match.
-        std::string pam = match_sequence.substr(20, 3);
+        std::string pam;
+        if (match_sequence.length() < 20) {
+          pam = "";
+        } else {
+          pam = match_sequence.substr(20, 3);
+        }
 
-        if ((match.mismatches == 0) && (pam.substr(1, 2) == "GG"))
+        if ((match.mismatches == 0) && (pam.length() == 3) && (pam.substr(1, 2) == "GG"))
           perfect_match = true;
 
         std::string csvline = get_csv_line(gi, k, start, match, off_target_abs_coords, complete);
