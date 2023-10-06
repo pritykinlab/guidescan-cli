@@ -120,9 +120,9 @@ namespace genomics {
       output << csv_lines;
       output_mtx.unlock();
     } else {
-      std::string sam_line = genomics::get_sam_line(gi_forward, k, opts.start, opts.max_off_targets, off_targets, complete);
+      std::string sam_lines = genomics::get_sam_lines(gi_forward, k, opts.start, opts.max_off_targets, off_targets, complete);
       output_mtx.lock();
-      output << sam_line << std::endl;
+      output << sam_lines;
       output_mtx.unlock();
     }
   }
