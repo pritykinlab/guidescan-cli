@@ -296,50 +296,68 @@ namespace genomics {
       }
     }
 
-    return csvlines;
-  }
-
-  template <class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
-  std::string get_sam_line(const genome_index<t_wt, t_dens, t_inv_dens>& gi,
-                           const kmer& k, bool start, int64_t max_off_targets,
-                           std::vector<std::vector<std::tuple<int64_t, match>>>& off_targets,
-                           bool complete) {
-    std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
-    std::string samline(k.id);                                     // SAM:QNAME
-
-    samline += "\t";
-    samline += k.dir == direction::positive ? "0" : "16";          // SAM:FLAG (16 => SEQ being reverse complemented)
-    samline += "\t" + k.chromosome;                                // SAM:RNAME
-
-    samline += "\t" + std::to_string(k.position + 1);              // SAM:POS (1-indexed)
-    samline += "\t100";                                            // SAM:MAPQ
-    samline += "\t" + std::to_string(sequence.length()) + "M";     // SAM:CIGAR
-    samline += "\t*\t0\t0";                                        // SAM:RNEXT, SAM:PNEXT, SAM:TLEN
-
-    if (k.dir == direction::negative) {
-      samline += "\t" + reverse_complement(sequence);              // SAM:SEQ
-    } else {
-      samline += "\t" + sequence;                                  // SAM:SEQ
+      return csvlines;
     }
 
-    samline += "\t*";                                              // SAM:QUAL
-    
-    // store off-target counts in tag
-    for (uint64_t k = 0; k < off_targets.size(); k++) {
-        samline += "\tk" + std::to_string(k) + ":i:" + std::to_string(off_targets[k].size());
+    template<class t_wt, uint32_t t_dens, uint32_t t_inv_dens>
+    std::string get_sam_lines(const genome_index<t_wt, t_dens, t_inv_dens> &gi,
+                              const kmer &k, bool start, int64_t max_off_targets,
+                              std::vector<std::vector<std::tuple<int64_t, match>>> &off_targets,
+                              bool complete) {
+
+      std::string samlines;
+
+      std::string offtarget_hex;
+      float specificity;
+      tie(offtarget_hex, specificity) = off_target_fields(k, gi.gs, off_targets, max_off_targets);
+
+      for (uint64_t i = 0; i < off_targets.size(); i++) {
+        for (const auto &t: off_targets[i]) {
+          auto pos = std::get<0>(t);
+          auto match = std::get<1>(t);
+
+          // For each perfect alignment (mismatches==0), write a SAM line
+          if (match.mismatches == 0) {
+            coordinates c;
+            std::string strand;
+            tie(c, strand) = resolve_absolute(gi.gs, pos, k);
+
+            std::string sequence = start ? k.pam + k.sequence : k.sequence + k.pam;
+            std::string samline(k.id);                                     // SAM:QNAME
+
+            samline += "\t";
+            samline += k.dir == direction::positive ? "0" : "16";          // SAM:FLAG (16 => SEQ being reverse complemented)
+            samline += "\t" + c.chr.name;                                  // SAM:RNAME
+
+            samline += "\t" + std::to_string(c.offset);                    // SAM:POS (1-indexed)
+            samline += "\t100";                                            // SAM:MAPQ
+            samline += "\t" + std::to_string(sequence.length()) + "M";     // SAM:CIGAR
+            samline += "\t*\t0\t0";                                        // SAM:RNEXT, SAM:PNEXT, SAM:TLEN
+
+            if (k.dir == direction::negative) {
+              samline += "\t" + reverse_complement(sequence);              // SAM:SEQ
+            } else {
+              samline += "\t" + sequence;                                  // SAM:SEQ
+            }
+
+            samline += "\t*";                                              // SAM:QUAL
+
+            // store off-target counts in tag
+            for (uint64_t k = 0; k < off_targets.size(); k++) {
+              samline += "\tk" + std::to_string(k) + ":i:" + std::to_string(off_targets[k].size());
+            }
+
+            if (complete) {
+              samline += "\tof:H:" + offtarget_hex;
+            }
+            samline += "\tsp:f:" + std::to_string(specificity);
+
+            samlines += samline + "\n";
+          }
+        }
+      }
+      return samlines;
     }
-
-    std::string offtarget_hex;
-    float specificity;
-    tie(offtarget_hex, specificity) = off_target_fields(k, gi.gs, off_targets, max_off_targets);
-
-    if (complete) {
-        samline += "\tof:H:" + offtarget_hex;
-    }
-    samline += "\tsp:f:" + std::to_string(specificity);
-
-    return samline;
-  }
 };
 
 #endif /* PRINTER_H */
