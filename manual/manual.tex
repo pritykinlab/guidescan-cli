@@ -1,4 +1,4 @@
-\documentclass[11pt]{article}
+\documentclass[10pt]{article}
 
 \usepackage[utf8]{inputenc}
 \usepackage{minted}
@@ -17,7 +17,10 @@
 
 \usepackage[citestyle=alphabetic,bibstyle=numeric]{biblatex}
 \addbibresource{manual.bib}
-
+\usepackage{libertine}
+\usepackage{mweights}
+\usepackage[bigdelims,cmintegrals,libertine,vvarbb]{newtxmath}
+\usepackage{zi4}
 \usepackage{fancyhdr}
 \usepackage{hyperref}
 
@@ -27,7 +30,7 @@
 
 \pagestyle{fancy}
 
-\linespread{1.2}
+%\linespread{1.2}
 
 \geometry{margin=1in}
 
@@ -36,7 +39,7 @@
 \def\CC{{C\nolinebreak[4]\hspace{-.05em}\raisebox{.4ex}{\tiny\bf ++}}}
 
 \author{Henri Schmidt$^1$}
-\title{Guidescan2 Software Manual}
+\title{GuideScan2 Software Manual}
 \date{
     $^1$Department of Computer Science, Princeton University\\[2ex]%
     \today
@@ -49,46 +52,33 @@
 \newpage
 
 \section{Installation}
+GuideScan2 is available on bioconda and can be installed using the
+following command.
+\begin{minted}[frame=lines]{shell-session}
+  $ conda install -c bioconda guidescan
+\end{minted}
+%https://github.com/pritykinlab/guidescan-cli
+Binaries for each release of GuideScan2 are published on GitHub 
+at
+\begin{center}
+\texttt{https://github.com/pritykinlab/guidescan-cli/releases}.
+\end{center}
+If you would like to build GuideScan2 from source, the
+instructions are below.
 \subsection{Software Dependencies}
-The off-target enumeration tool, Guidescan2, relies on the
+The off-target enumeration tool, GuideScan2, relies on the
 installation of a modern \CC\ compiler and associated
-buildtools. Explicitly, the tool has the following dependencies.
+buildtools. In particular, GuideScan2 has the following dependencies.
 \begin{itemize}
 \item CMake version 3.1.0 or higher
-\item \CC\ compiler that supports C++11 features such as:
-  \begin{itemize}
-  \item regex
-  \item constexpr
-  \item default constructors
-  \end{itemize}
-\item \CC\ support for POSIX threads (pthreads) 
+\item \CC\ compiler that supports \CC14
+\item \CC\ support for POSIX threads
 \end{itemize}
-It is known that GCC version 4.9 or greater and clang 3.1 or greater
-with libc\texttt{++} are both supported. But to error on the side of caution,
-the most up to date and stable version of GCC is recommended. As often
-high-performance computing clusters do not possess recent versions of
-\CC\ compilers, it is therefore recommended that the software is built
-and executed in some sort of virtual environment. We have had success
-with Singularity and Docker for these special cases, though if a
-modern compiler is available, that can be used instead.
-
-The aforementioned dependencies are the bare minimum to obtain
-anything useful out of the tool. However, it is strongly recommended,
-and necessary in some our pipelines, that biological computing tools
-are also available. In particular, the Samtools suite is useful since
-the output database will be in a SAM file format
-\parencite{danecek2021twelve}. There are also bindings for the tool in
-several programming languages that may help users to interface with
-the Guidescan2 databases programatically.
-
-Helper scripts for various pipelines require a Python3 and Conda
-installation. We include a Conda environment file that contains all
-the necessary dependencies, though the scripts should run fine if
-standard data science packages are installed. 
+GuideScan2 was tested with GCC version 4.9 and clang 3.1 with libc\texttt{++}. 
 
 \subsection{Build Procedure}
-Building the off-target enumeration tool, Guidescan2, is
-straightforward usign CMake once the dependencies have been
+Building the off-target enumeration tool, GuideScan2, is
+straightforward using CMake once the dependencies have been
 installed. First set the working directory to the guidescan-cli
 project root. Then execute the following commands.
 
@@ -114,19 +104,19 @@ permanently updates your \texttt{\$PATH} in your bashrc.
 \end{minted}
 
 \section{Command Line Interface}
-For ease of exposition, we will assume Guidescan2 is installed under
+For ease of exposition, we will assume GuideScan2 is installed under
 your path and can be executed by simply running the command
 $\texttt{guidescan}$. However, everything will apply even if you
-execute Guidescan2 using its absolute path.
+execute GuideScan2 using its absolute path.
 
-To run the Guidescan2 off-target enumeration and view its
+To run the GuideScan2 off-target enumeration and view its
 sub-commands, simply execute the program with the \texttt{--help}
 flag.
 \begin{minted}[frame=lines]{shell-session}
   $ guidescan --help
 \end{minted}
 
-There are three sub-commands for the Guidescan2 tool. 
+There are three sub-commands for the GuideScan2 tool. 
 \begin{itemize}
 \item \texttt{index}: Constructs a genomic index from a FASTA file.
 \item \texttt{enumerate}: Enumerates off-targets against a reference
@@ -195,7 +185,7 @@ online fashion with the \texttt{enumerate} sub-command. Input to this
 command is an index and a set of kmers to evaluate off-targets
 against. PAMs are included in this kmer set and are matched at the
 specified end of the kmer. The output is a database in SAM file format
-containing kmers that have passed the Guidescan2 filtering
+containing kmers that have passed the GuideScan2 filtering
 step. Complete off-target information is hex-encoded in the
 \texttt{of} field and can be decoded using an included Python3 script
 described later.
@@ -248,7 +238,7 @@ ce11_example_4,TATAAACTGTCAAAGTTGAG,NGG,chrIV,23703,+
 \subsection{Kmer Set Generation}
 As mentioned earlier, {\it kmer set} generation can be peformed manually,
 for example, when you want to evaluate a specific set of gRNAs.
-Additionally, Guidescan2 can also generate {\it kmer set} automatically.
+Additionally, GuideScan2 can also generate {\it kmer set} automatically.
 To generate {\it kmer sets} we include a Python3 script,
 \texttt{generate\_kmers.py}, that generates a set of kmers against an
 input FASTA file. To use the script simply write
@@ -272,8 +262,8 @@ with \texttt{samtools} and comparison with \texttt{.sam} files.
 The dependencies for the script are Python3 and the Biopython toolkit.
 
 \section{Off-Target Databases}
-Guidescan2 outputs databases in the SAM file format, a common file
-format used in Bioinformatics. At minimum, the Guidescan2 database
+GuideScan2 outputs databases in the SAM file format, a common file
+format used in Bioinformatics. At minimum, the GuideScan2 database
 contains the off-target set for each screened kmer as well as
 chromosomal structure information. Importantly, \textbf{the header is
   essential} for downstream processing; take care to not delete it
@@ -291,8 +281,8 @@ human-readable format.
 \subsection{Decoding}
 
 The script \texttt{decode\_database.py} is a Python3 script that decodes
-Guidescan2 databases sequentially into a human-readable CSV format. It
-takes the Guidescan2 SAM/BAM database and the original FASTA file as
+GuideScan2 databases sequentially into a human-readable CSV format. It
+takes the GuideScan2 SAM/BAM database and the original FASTA file as
 input and outputs a CSV to \texttt{stdout}. The script outputs
 information in two modes, denoted {\it succinct} and {\it
   complete}, which we will describe below.
@@ -314,7 +304,7 @@ genomic location of all off-targets for each kmer. In addition, in the
 is derived. We warn that since some kmers can have up to hundreds of
 thousands of off-targets, {\it complete} mode can result in an
 extremely large output. If this is of concern we recommend that you
-re-run Guidescan2 with a smaller value of mismatch parameter and then
+re-run GuideScan2 with a smaller value of mismatch parameter and then
 decode the databases again.
 
 To run the script simply write,
@@ -328,7 +318,7 @@ for the program to properly execute. By default this is the
 case, but we caution that when moving the script, move the
 \texttt{scripts/cfd/} sub-directory as well.
 
-\section{Guidescan2 Pipelines}
+\section{GuideScan2 Pipelines}
 \subsection{Analysis of Individual gRNAs}
 Here we introduce a pipeline for the analysis of a small set of gRNAs
 that have been gathered from external sources. In our example, we will
@@ -362,7 +352,7 @@ commands, assuming the downloaded tarball has name \texttt{hg38.tar}.
 
 It will also be useful to include the file \texttt{chr2acc} which maps
 chromosome names to NCBI accessions, which are used internally in
-Guidescan2. For example, this file can be found on the NCBI FTP server
+GuideScan2. For example, this file can be found on the NCBI FTP server
 at the location:
 
 \begin{center}
@@ -383,13 +373,13 @@ X	NC_000023.11
 Y	NC_000024.10
     \end{minted}
     \caption{\label{fig:chr2acc} chr2acc file that maps standard
-      chromosome names to NCBI accession identifiers. Guidescan2 uses
+      chromosome names to NCBI accession identifiers. GuideScan2 uses
       these identifiers internally since they uniquely identify
       organism version and chromosome simultaneously. }
 \end{figure}
 
 Now, since the reference genome is a raw FASTA file, we can run
-Guidescan2 indexing on it as follows. Note that this step can require
+GuideScan2 indexing on it as follows. Note that this step can require
 up to 32GB of memory for large genomes. When generating the index for
 \textit{hg38}, this step took a maximum of 30GB of memory. Large
 temporary files with extension \texttt{.sdsl} will be created and
@@ -403,10 +393,10 @@ subsequently deleted during this process.
 Note that we specify the prefix to ensure the commands are short and
 delete the temporary files \texttt{*.dna} once the index has been
 constructed. If memory constraints are an issue, we remind the user
-that pre-constructed indices can be found \hl{here}.
+that pre-constructed indices can be found \texttt{https://guidescan.com/downloads}.
 
 With the index constructed, we then turn to processing the gRNAs into
-the {\it kmer set} format for processing by Guidescan2. For the sake
+the {\it kmer set} format for processing by GuideScan2. For the sake
 of example, we will randomly select of 250 genes to process.
 
 \begin{minted}[frame=lines]{shell-session}
@@ -475,7 +465,7 @@ with open(sys.argv[2]) as f:
     chromosome to accession names.}
 \end{figure}
 
-Finally, our {\it kmer set} is ready to run through Guidescan2. After
+Finally, our {\it kmer set} is ready to run through GuideScan2. After
 moving everything to the correct directory, we can evaluate our {\it
   kmer set} with the following command.  \vspace{-0.8em}
 \begin{minted}[frame=lines]{shell-session}
@@ -489,7 +479,7 @@ output database. That is,
 \begin{minted}[frame=lines]{shell-session}
   $ wc -l db.sam
 \end{minted}
-tells you how many kmers have successfully been processed by Guidescan2.
+tells you how many kmers have successfully been processed by GuideScan2.
 
 To make our output human readable, we run our decoding script on the
 output database, passing in the reference FASTA file as input.
@@ -528,7 +518,7 @@ commands, assuming the downloaded tarball has name \texttt{cell.tar}.
 \end{minted}
 
 Now, since the reference genome is a raw FASTA file, we can run
-Guidescan2 indexing on it as follows. Note that this step can require
+GuideScan2 indexing on it as follows. Note that this step can require
 up to 32GB of memory for large genomes. When generating the index for
 \textit{hg38}, this step took a maximum of 30GB of memory. Large
 temporary files with extension \texttt{.sdsl} will be created and
@@ -547,7 +537,7 @@ that pre-constructed indices can be found \hl{here}.
 At this point, we will deviate from the analysis in the previous
 section. Instead of looking at a targeted set of gRNAs received from a
 third-party, we will construct a genome wide set of gRNAs using
-Guidescan2. To do this we need to specify the {\it targetable space}
+GuideScan2. To do this we need to specify the {\it targetable space}
 of the genome. For standard CRISPR Cas9 enzymes, this corresponds to
 the set of all 20-mers followed by NGG PAMs; but it varies across
 CRISPR systems. Accordingly, we run the \texttt{generate\_kmers.py}
@@ -563,7 +553,7 @@ pieces. The *nix \texttt{split} utility is useful for this
 purpose. And then we append the header to each split. Since this is a
 little bit more complex, we include it as a script (Figure
 \ref{fig:splitkmers}). With the kmers set split into pieces, we can
-run Guidescan2 seperately on each piece and then merge the resulting
+run GuideScan2 seperately on each piece and then merge the resulting
 SAM files together. The exact steps necessary depend upon on the
 computing resources available, but it should be straightforward. As an
 example, we will enumerate gRNAs in a sequential fashion.
@@ -630,11 +620,11 @@ of generating allele specific guides for an F1 hybrid B6/129S1 mouse
 genome, we used the \textit{mm38} reference genome and a synthetic
 \textit{129S1} genome. If high quality genomes and mappings between them are
 available for both alleles, then it is not necessary to generate a
-synthetic genome. But this was not the case for 129S1.
+synthetic genome.
 
 We co-opted the MMARGE tool built for epigenetic data to construct
 both a \textit{129S1} reference genome and a mapping between
-\textit{129S1} and \textit{mm38} \parencite{link2018mmarge}. We used
+\textit{129S1} reference and the \textit{mm38} reference \parencite{link2018mmarge}. We used
 the reference assembly \texttt{GRCm38\_68.fa} from Ensemble release 68
 and the sequence variation files from the Mouse Genome Project
 \parencite{keane2011mouse}. At the time of publication, the VCF files
@@ -654,12 +644,12 @@ we include the code we used for this in (Listing
 
 At this point, we assume the reader has two reference genomes,
 referred to as \texttt{grcm38.fa} and \texttt{129s1.fa} and a mapping
-between the coordinates of the two. We now run Guidescan2 off-target
+between the coordinates of the two. We now run GuideScan2 off-target
 database construction as in sub-section \ref{subsec:offtargetdb} for
-each of these genomes seperately. This will result in two Guidescan2
+each of these genomes seperately. This will result in two GuideScan2
 databases \texttt{grcm38.sam} and \texttt{129s1.sam} for the
 corresponding references. These consist of the sets of gRNAs that have
-passed standard Guidescan2 filtering. From these databases, we
+passed standard GuideScan2 filtering. From these databases, we
 construct two {\it kmer sets} and then run these against the indices
 for the opposite allele with a an exact match threshold of 0. This
 will result in two sets of gRNAs that have exact matches on only one
